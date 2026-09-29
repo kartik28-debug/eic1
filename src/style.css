@@ -37,7 +37,7 @@ body {
   line-height: 1.6;
 }
 
-/* ─── 3D CANVAS STICKY BACKGROUND ─────────────────────────────────── */
+/* ─── 3D CANVAS STICKY BACKGROUND & FULLSCREEN INTRO ─────────────── */
 .city-sticky-bg {
   position: fixed;
   top: 0;
@@ -46,6 +46,38 @@ body {
   height: 100vh;
   z-index: 0;
   pointer-events: none;
+  transition: z-index 0.3s ease;
+}
+
+/* Full-Screen Intro State */
+body.in-intro #city-sticky {
+  z-index: 9999;
+  pointer-events: auto;
+}
+
+body.in-intro .navbar,
+body.in-intro .content-wrapper {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* Transitioning State */
+body.in-transition #city-sticky {
+  z-index: 0;
+}
+
+body.in-transition .navbar,
+body.in-transition .content-wrapper {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 1.4s ease-in-out;
+}
+
+.navbar,
+.content-wrapper {
+  transition: opacity 1.4s ease-in-out;
 }
 
 #city-canvas {

@@ -1,7 +1,7 @@
 /**
  * NeonCity3D — Scroll-driven wireframe city scene
  * Plain JavaScript (ES modules) + Three.js
- * EIC IIIT Una Digital Ecosystem Backdrop
+ * EIC IIIT Una Digital Ecosystem Backdrop & Full-Screen Cinematic Intro
  */
 
 import * as THREE from 'three';
@@ -287,13 +287,13 @@ function updateScroll() {
 window.addEventListener('scroll', updateScroll, { passive: true });
 updateScroll();
 
-// ─── Cinematic Intro State ────────────────────────────────────────────────────
-let introPlaying = true;
+// ─── State Machine: 'intro' | 'transition' | 'normal' ────────────────────────
+let sceneState = REDUCED_MOTION ? 'normal' : 'intro';
 let introStartTime = null;
-const INTRO_DURATION = 7.0; // 7 seconds intro camera flythrough
-const OUTRO_TRANSITION_DURATION = 2.0; // 2 seconds smooth return to scroll position
-let outroStartTime = null;
-let introFinished = false;
+const INTRO_DURATION = 6.0; // 6 seconds full-screen cinematic camera journey
+
+let transitionStartTime = null;
+const TRANSITION_DURATION = 1.4; // 1.4 seconds smooth transition & content reveal
 
 function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -316,38 +316,44 @@ if (REDUCED_MOTION) {
     lastTime = time;
     const t  = time * 0.001;
 
-    let currentProgress = 0;
+    let cameraProgress = 0;
 
-    if (introPlaying) {
-      if (introStartTime === null) introStartTime = time;
+    if (sceneState === 'intro') {
+      if (introStartTime === null) {
+        introStartTime = time;
+        document.body.classList.add('in-intro');
+      }
       const elapsed = (time - introStartTime) * 0.001;
       const rawT = Math.min(1.0, elapsed / INTRO_DURATION);
-      currentProgress = easeInOutCubic(rawT);
+      cameraProgress = easeInOutCubic(rawT);
 
       if (rawT >= 1.0) {
-        introPlaying = false;
-        outroStartTime = time;
+        sceneState = 'transition';
+        transitionStartTime = time;
+        document.body.classList.remove('in-intro');
+        document.body.classList.add('in-transition');
       }
-    } else if (!introFinished) {
-      // Smoothly transition from 1.0 (end of intro) to actual current scrollRaw
-      const elapsedOutro = (time - outroStartTime) * 0.001;
-      const outroT = Math.min(1.0, elapsedOutro / OUTRO_TRANSITION_DURATION);
-      const easedOutro = easeInOutCubic(outroT);
+    } else if (sceneState === 'transition') {
+      const elapsed = (time - transitionStartTime) * 0.001;
+      const rawT = Math.min(1.0, elapsed / TRANSITION_DURATION);
+      const easedT = easeInOutCubic(rawT);
 
-      currentProgress = THREE.MathUtils.lerp(1.0, scrollRaw, easedOutro);
+      // Smoothly lerp camera progress from 1.0 (end of intro) to current scrollRaw
+      cameraProgress = THREE.MathUtils.lerp(1.0, scrollRaw, easedT);
 
-      if (outroT >= 1.0) {
-        introFinished = true;
+      if (rawT >= 1.0) {
+        sceneState = 'normal';
+        document.body.classList.remove('in-transition');
         scrollLerped = scrollRaw;
       }
     } else {
       // Normal scroll-driven behavior
       scrollLerped += (scrollRaw - scrollLerped) * LERP * dt;
-      currentProgress = scrollLerped;
+      cameraProgress = scrollLerped;
     }
 
-    // Camera positioning based on currentProgress
-    sampleCam(currentProgress);
+    // Camera positioning based on cameraProgress
+    sampleCam(cameraProgress);
     camPos.lerp(_tPos,  0.055 * dt);
     camLook.lerp(_tLook, 0.055 * dt);
     camera.position.copy(camPos);
@@ -358,7 +364,7 @@ if (REDUCED_MOTION) {
       b.group.position.y = Math.sin(t + b.floatPhase) * b.floatAmp - 2;
       b.group.rotation.y += b.rotSpeed;
       const farFactor = Math.abs(b.baseZ) > 15 ? 0.20 : 0.07;
-      b.group.position.z = b.baseZ + currentProgress * 32 * farFactor;
+      b.group.position.z = b.baseZ + cameraProgress * 32 * farFactor;
     });
 
     // Spheres — orbital + float + vertical lift
@@ -368,7 +374,7 @@ if (REDUCED_MOTION) {
       s.mesh.position.z = s.baseZ + Math.sin(angle) * s.orbitR * 0.45;
       const liftFactor  = s.orbitY > 10 ? 0.14 : 0.08;
       s.mesh.position.y = s.orbitY + Math.sin(t + s.floatPhase) * s.floatAmp
-                          + currentProgress * 8 * liftFactor;
+                          + cameraProgress * 8 * liftFactor;
     });
 
     // Arcs — continuous trailing animation
