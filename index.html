@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neon City — Scroll 3D Experience</title>
+    <meta name="description" content="An immersive scroll-driven 3D wireframe city experience built with Three.js" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Section above the 3D scene (placeholder) -->
+    <section class="hero-section">
+      <div class="hero-content">
+        <p class="hero-label">SCROLL TO EXPLORE</p>
+        <h1 class="hero-title">Enter the Grid</h1>
+        <p class="hero-sub">A wireframe journey through neon architecture.</p>
+        <div class="scroll-hint">
+          <span class="scroll-arrow"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── 3D Scroll Animation Section ── -->
+    <section id="city-3d-section" class="city-section" aria-label="3D Neon City Scroll Animation">
+      <!-- Sticky container that pins the canvas while scrolling -->
+      <div id="city-sticky" class="city-sticky">
+        <canvas id="city-canvas"></canvas>
+
+        <!-- Minimal overlay labels that fade in/out with scroll -->
+        <div class="scene-overlay" id="scene-overlay">
+          <div class="overlay-label" id="label-0" data-phase="0">
+            <span class="label-text">Initializing Grid</span>
+          </div>
+          <div class="overlay-label" id="label-1" data-phase="1">
+            <span class="label-text">Network Active</span>
+          </div>
+          <div class="overlay-label" id="label-2" data-phase="2">
+            <span class="label-text">Signal Routed</span>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="scroll-progress-bar"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section below the 3D scene (placeholder) -->
+    <section class="after-section">
+      <div class="after-content">
+        <p class="after-label">CONNECTED</p>
+        <h2 class="after-title">The City Awaits</h2>
+        <p class="after-sub">Explore the infrastructure of tomorrow.</p>
+      </div>
+    </section>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
