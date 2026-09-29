@@ -2,62 +2,576 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/eic-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Neon City — Scroll 3D Experience</title>
-    <meta name="description" content="An immersive scroll-driven 3D wireframe city experience built with Three.js" />
+    <title>EIC — Entrepreneurship & Incubation Cell | IIIT Una</title>
+    <meta name="description" content="EIC IIIT Una — Where ideas become ventures. Explore our interactive 3D startup ecosystem, E-Summit, Bech Ke Dikhao, and upcoming EIC Market." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <!-- Section above the 3D scene (placeholder) -->
-    <section class="hero-section">
-      <div class="hero-content">
-        <p class="hero-label">SCROLL TO EXPLORE</p>
-        <h1 class="hero-title">Enter the Grid</h1>
-        <p class="hero-sub">A wireframe journey through neon architecture.</p>
-        <div class="scroll-hint">
-          <span class="scroll-arrow"></span>
-        </div>
-      </div>
-    </section>
 
-    <!-- ── 3D Scroll Animation Section ── -->
-    <section id="city-3d-section" class="city-section" aria-label="3D Neon City Scroll Animation">
-      <!-- Sticky container that pins the canvas while scrolling -->
-      <div id="city-sticky" class="city-sticky">
-        <canvas id="city-canvas"></canvas>
+    <!-- ── 3D CANVAS BACKGROUND & SCROLL CONTAINER ── -->
+    <div id="city-sticky" class="city-sticky-bg">
+      <canvas id="city-canvas"></canvas>
+      <div class="grid-overlay-vignette"></div>
+    </div>
 
-        <!-- Minimal overlay labels that fade in/out with scroll -->
-        <div class="scene-overlay" id="scene-overlay">
-          <div class="overlay-label" id="label-0" data-phase="0">
-            <span class="label-text">Initializing Grid</span>
+    <!-- ── FLOATING NAVIGATION ── -->
+    <header class="navbar" id="navbar">
+      <div class="nav-container">
+        <a href="#hero" class="nav-brand">
+          <img src="/eic-logo.png" alt="EIC IIIT Una Logo" class="nav-logo" />
+          <div class="nav-brand-text">
+            <span class="brand-title">EIC</span>
+            <span class="brand-sub">IIIT UNA</span>
           </div>
-          <div class="overlay-label" id="label-1" data-phase="1">
-            <span class="label-text">Network Active</span>
+        </a>
+
+        <button class="mobile-toggle" id="mobile-toggle" aria-label="Toggle navigation menu">
+          <span></span><span></span><span></span>
+        </button>
+
+        <nav class="nav-menu" id="nav-menu">
+          <a href="#about" class="nav-link">ABOUT</a>
+          <a href="#ecosystem" class="nav-link">ECOSYSTEM</a>
+          <a href="#esummit" class="nav-link">E-SUMMIT</a>
+          <a href="#bechkedikhao" class="nav-link">BECH KE DIKHAO</a>
+          <a href="#events" class="nav-link">EVENTS</a>
+          <a href="#market" class="nav-link">MARKET</a>
+          <a href="#team" class="nav-link">TEAM</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- ── MAIN CONTENT SCROLL WRAPPER ── -->
+    <main class="content-wrapper">
+
+      <!-- 1. HERO SECTION -->
+      <section id="hero" class="section hero-section">
+        <div class="hero-content">
+          <div class="logo-emblem-wrapper">
+            <img src="/eic-logo.png" alt="EIC Emblem" class="hero-logo-img" />
+            <div class="logo-glow-ring"></div>
           </div>
-          <div class="overlay-label" id="label-2" data-phase="2">
-            <span class="label-text">Signal Routed</span>
+
+          <div class="status-pill">
+            <span class="status-dot"></span>
+            <span class="status-text">IIIT UNA STARTUP ECOSYSTEM</span>
+          </div>
+
+          <h1 class="hero-title">EIC</h1>
+          <p class="hero-subtitle">Entrepreneurship & Incubation Cell — IIIT Una</p>
+          <p class="hero-tagline">"Where ideas become ventures."</p>
+
+          <div class="hero-actions">
+            <a href="#ecosystem" class="btn btn-primary">
+              <span>EXPLORE THE ECOSYSTEM</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </a>
+            <a href="#market" class="btn btn-secondary">
+              <span>EIC MARKET TERMINAL</span>
+            </a>
           </div>
         </div>
 
-        <!-- Progress bar -->
-        <div class="progress-bar-track">
-          <div class="progress-bar-fill" id="scroll-progress-bar"></div>
+        <div class="scroll-indicator">
+          <span class="scroll-text">SCROLL TO NAVIGATE CITY</span>
+          <div class="scroll-mouse"><div class="scroll-wheel"></div></div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Section below the 3D scene (placeholder) -->
-    <section class="after-section">
-      <div class="after-content">
-        <p class="after-label">CONNECTED</p>
-        <h2 class="after-title">The City Awaits</h2>
-        <p class="after-sub">Explore the infrastructure of tomorrow.</p>
-      </div>
-    </section>
+      <!-- 2. ABOUT EIC -->
+      <section id="about" class="section glass-section">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-tag">[ 01 // OVERVIEW ]</span>
+            <h2 class="section-title">EXPLORE. CREATE. GROW.</h2>
+          </div>
+
+          <div class="about-grid">
+            <div class="about-text-card">
+              <p class="lead-text">
+                <strong>EIC</strong>, the Entrepreneurship and Incubation Cell at <strong>IIIT Una</strong>, is where aspiring entrepreneurs and innovators come together to explore, create, and grow.
+              </p>
+              <p class="body-text">
+                We provide the mentorship, infrastructure, seed network, and competitive platforms needed to transform raw technical ideas into scalable, market-ready enterprises.
+              </p>
+            </div>
+
+            <!-- PLACEHOLDER METRICS (No fabricated numbers) -->
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <span class="metric-value" data-value="--">[ -- ]</span>
+                <span class="metric-label">EVENTS CONDUCTED</span>
+                <span class="metric-sub">Flagships & Workshops</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-value" data-value="--">[ -- ]</span>
+                <span class="metric-label">ACTIVE MEMBERS</span>
+                <span class="metric-sub">Innovators & Strategists</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-value" data-value="--">[ -- ]</span>
+                <span class="metric-label">IDEAS INCUBATED</span>
+                <span class="metric-sub">Student & Alumni Ventures</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-value" data-value="--">[ -- ]</span>
+                <span class="metric-label">INITIATIVES</span>
+                <span class="metric-sub">Market & Pitch Modules</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. EIC ECOSYSTEM -->
+      <section id="ecosystem" class="section glass-section">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-tag">[ 02 // ARCHITECTURE ]</span>
+            <h2 class="section-title">THE EIC ECOSYSTEM</h2>
+            <p class="section-subtitle">An interactive digital landscape connecting founders, pitch arenas, and capital pathways.</p>
+          </div>
+
+          <!-- PRIMARY FLAGSHIPS -->
+          <div class="flagship-grid">
+            <a href="#esummit" class="ecosystem-node node-flagship">
+              <div class="node-badge">FLAGSHIP CONCLAVE</div>
+              <h3 class="node-title">E-SUMMIT</h3>
+              <p class="node-desc">Annual flagship entrepreneurship summit bringing together venture capitalists, industry leaders, and aspiring student founders.</p>
+              <div class="node-footer">
+                <span class="node-link-text">EXPLORE TERMINAL →</span>
+              </div>
+            </a>
+
+            <a href="#bechkedikhao" class="ecosystem-node node-flagship node-secondary">
+              <div class="node-badge">PITCHING ARENA</div>
+              <h3 class="node-title">BECH KE DIKHAO</h3>
+              <p class="node-desc">High-stakes live sales & pitch simulation where founders validate real product market viability under market pressure.</p>
+              <div class="node-footer">
+                <span class="node-link-text">ENTER ARENA →</span>
+              </div>
+            </a>
+          </div>
+
+          <!-- SECONDARY NODES -->
+          <div class="subnodes-grid">
+            <div class="ecosystem-node node-sub">
+              <div class="node-icon">⚡</div>
+              <h4 class="subnode-title">Startup Workshops</h4>
+              <p class="subnode-desc">Hands-on sessions on cap tables, legal compliance, MVP prototyping, and growth marketing.</p>
+            </div>
+            <div class="ecosystem-node node-sub">
+              <div class="node-icon">🏆</div>
+              <h4 class="subnode-title">Innovation Challenges</h4>
+              <p class="subnode-desc">Problem-solving hackathons tackling real industrial & societal challenges.</p>
+            </div>
+            <div class="ecosystem-node node-sub">
+              <div class="node-icon">🚀</div>
+              <h4 class="subnode-title">Entrepreneurial Bootcamps</h4>
+              <p class="subnode-desc">Intensive multi-week incubator programs taking startups from concept to seed pitch.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. E-SUMMIT -->
+      <section id="esummit" class="section glass-section">
+        <div class="section-container">
+          <div class="terminal-box">
+            <div class="terminal-bar">
+              <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+              <span class="terminal-title">E-SUMMIT // FLAGSHIP VENTURE CONCLAVE</span>
+              <span class="terminal-status">[ STATUS: UPCOMING EDITION ]</span>
+            </div>
+
+            <div class="terminal-content">
+              <div class="esummit-hero-block">
+                <div class="esummit-text">
+                  <span class="cyber-badge">ANNUAL FLAGSHIP</span>
+                  <h3 class="esummit-title">E-SUMMIT IIIT UNA</h3>
+                  <p class="esummit-desc">
+                    The premier entrepreneurial summit of IIIT Una — a gathering of visionaries, venture capital partners, keynote speakers, and revolutionary tech startups.
+                  </p>
+                </div>
+                <!-- IMAGE PLACEHOLDER -->
+                <div class="image-placeholder-frame">
+                  <div class="placeholder-icon">📷</div>
+                  <div class="placeholder-label">[ FLAGSHIP BANNER PLACEHOLDER ]</div>
+                  <div class="placeholder-sub">Official E-Summit visuals & keynotes will be displayed here</div>
+                </div>
+              </div>
+
+              <!-- PLACEHOLDER GRID FOR SPEAKERS / HIGHLIGHTS -->
+              <div class="esummit-grid">
+                <div class="esummit-card">
+                  <h4 class="card-heading">KEYNOTE SPEAKERS</h4>
+                  <div class="slot-box">
+                    <span class="slot-tag">[ SPEAKER SLOTS TO BE ANNOUNCED ]</span>
+                  </div>
+                </div>
+                <div class="esummit-card">
+                  <h4 class="card-heading">CONCLAVE HIGHLIGHTS</h4>
+                  <div class="slot-box">
+                    <span class="slot-tag">[ PANEL DISCUSSIONS & PITCH SESSIONS ]</span>
+                  </div>
+                </div>
+                <div class="esummit-card">
+                  <h4 class="card-heading">PREVIOUS EDITIONS</h4>
+                  <div class="slot-box">
+                    <span class="slot-tag">[ ARCHIVE & GALLERY PLACEHOLDER ]</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="esummit-actions">
+                <button class="btn btn-outline disabled" disabled>
+                  <span>REGISTRATION OPENING SOON</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. BECH KE DIKHAO -->
+      <section id="bechkedikhao" class="section glass-section">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-tag">[ 04 // PITCHING ARENA ]</span>
+            <h2 class="section-title">BECH KE DIKHAO</h2>
+            <p class="section-subtitle">The ultimate market validation and sales pitching battlefield.</p>
+          </div>
+
+          <!-- PIPELINE DIAGRAM -->
+          <div class="pipeline-wrapper">
+            <div class="pipe-step">
+              <span class="pipe-num">01</span>
+              <span class="pipe-title">IDEA</span>
+              <span class="pipe-desc">Formulate product pitch</span>
+            </div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step active">
+              <span class="pipe-num">02</span>
+              <span class="pipe-title">PITCH</span>
+              <span class="pipe-desc">Live market battle</span>
+            </div>
+            <div class="pipe-arrow">→</div>
+            <div class="pipe-step">
+              <span class="pipe-num">03</span>
+              <span class="pipe-title">MARKET</span>
+              <span class="pipe-desc">Customer acquisition</span>
+            </div>
+          </div>
+
+          <div class="arena-grid">
+            <div class="arena-info-card">
+              <h3 class="arena-card-title">ABOUT THE ARENA</h3>
+              <p class="body-text">
+                Bech Ke Dikhao challenges participants to sell real or conceptual products to tough judges and audience buyers. It tests persuasion, pricing strategy, negotiation, and valuation under time constraints.
+              </p>
+              <div class="placeholder-slot-container">
+                <div class="slot-item">[ EVENT DESCRIPTION & RULES PLACEHOLDER ]</div>
+                <div class="slot-item">[ PREVIOUS WINNERS & GALLERY PLACEHOLDER ]</div>
+              </div>
+            </div>
+
+            <div class="image-placeholder-frame tall">
+              <div class="placeholder-icon">🎯</div>
+              <div class="placeholder-label">[ ARENA HIGHLIGHTS PHOTO PLACEHOLDER ]</div>
+              <div class="placeholder-sub">Action shots from Bech Ke Dikhao pitching sessions</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. EVENTS TIMELINE -->
+      <section id="events" class="section glass-section">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-tag">[ 05 // TIMELINE ]</span>
+            <h2 class="section-title">EIC INITIATIVES & EVENTS</h2>
+            <p class="section-subtitle">Chronological progression of workshops, hackathons, and flagships.</p>
+          </div>
+
+          <!-- TIMELINE FILTER BUTTONS -->
+          <div class="timeline-tabs">
+            <button class="tab-btn active" data-filter="all">ALL INITIATIVES</button>
+            <button class="tab-btn" data-filter="past">PAST</button>
+            <button class="tab-btn" data-filter="now">NOW / LIVE</button>
+            <button class="tab-btn" data-filter="upcoming">UPCOMING</button>
+          </div>
+
+          <!-- TIMELINE GRID -->
+          <div class="events-grid" id="events-grid">
+            
+            <div class="event-card" data-category="upcoming">
+              <div class="event-status upcoming">[ UPCOMING ]</div>
+              <h3 class="event-name">E-Summit Flagship Edition</h3>
+              <span class="event-date">SCHEDULE PLACEHOLDER</span>
+              <p class="event-desc">The flagship entrepreneurship conclave of IIIT Una bringing top founders and VCs.</p>
+              <div class="event-media-placeholder">[ BANNER PLACEHOLDER ]</div>
+            </div>
+
+            <div class="event-card" data-category="now">
+              <div class="event-status now">[ REGISTRATION OPEN ]</div>
+              <h3 class="event-name">Bech Ke Dikhao Pitch Arena</h3>
+              <span class="event-date">SCHEDULE PLACEHOLDER</span>
+              <p class="event-desc">The live product selling and elevator pitching competition for innovative minds.</p>
+              <div class="event-media-placeholder">[ ARENA MEDIA PLACEHOLDER ]</div>
+            </div>
+
+            <div class="event-card" data-category="past">
+              <div class="event-status past">[ COMPLETED ]</div>
+              <h3 class="event-name">Startup Founders Workshop</h3>
+              <span class="event-date">PAST EDITION PLACEHOLDER</span>
+              <p class="event-desc">Interactive session covering legal fundamentals, cap tables, and term sheets for early stage startups.</p>
+              <div class="event-media-placeholder">[ HIGHLIGHTS PLACEHOLDER ]</div>
+            </div>
+
+            <div class="event-card" data-category="upcoming">
+              <div class="event-status upcoming">[ UPCOMING ]</div>
+              <h3 class="event-name">Innovation & Ideation Challenge</h3>
+              <span class="event-date">SCHEDULE PLACEHOLDER</span>
+              <p class="event-desc">Problem solving sprint focusing on deep-tech and sustainable engineering ventures.</p>
+              <div class="event-media-placeholder">[ MEDIA PLACEHOLDER ]</div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. EIC STARTUP MARKET -->
+      <section id="market" class="section glass-section">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-tag">[ 06 // FUTURE TERMINAL ]</span>
+            <h2 class="section-title">EIC MARKET</h2>
+            <p class="section-subtitle">"Where ideas become ventures." — Simulated Stock Exchange & Venture Dashboard.</p>
+          </div>
+
+          <div class="stock-terminal-frame">
+            <div class="terminal-header-bar">
+              <div class="terminal-tab active">📈 EIC INDEX BOARD</div>
+              <div class="terminal-tab disabled">[ FUTURE STOCK GAME ]</div>
+              <div class="terminal-status-right">LIVE SIMULATION MODE</div>
+            </div>
+
+            <div class="market-table-wrapper">
+              <table class="market-table">
+                <thead>
+                  <tr>
+                    <th>VENTURE ENTITY</th>
+                    <th>SECTOR</th>
+                    <th>STAGE</th>
+                    <th>INDEX VALUE</th>
+                    <th>TREND</th>
+                    <th>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <div class="ticker-cell">
+                        <span class="ticker-code">STARTUP 01</span>
+                        <span class="ticker-sub">Placeholder Venture</span>
+                      </div>
+                    </td>
+                    <td><span class="tag-tech">Deep Tech</span></td>
+                    <td>INCUBATION</td>
+                    <td><span class="mono-val">100.00 PTS</span></td>
+                    <td><span class="trend-up">+12.4% ▲</span></td>
+                    <td><span class="status-badge active">INCUBATING</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="ticker-cell">
+                        <span class="ticker-code">STARTUP 02</span>
+                        <span class="ticker-sub">Placeholder Venture</span>
+                      </div>
+                    </td>
+                    <td><span class="tag-tech">FinTech / Web3</span></td>
+                    <td>PRE-SEED</td>
+                    <td><span class="mono-val">100.00 PTS</span></td>
+                    <td><span class="trend-up">+8.1% ▲</span></td>
+                    <td><span class="status-badge active">PROTOTYPING</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="ticker-cell">
+                        <span class="ticker-code">STARTUP 03</span>
+                        <span class="ticker-sub">Placeholder Venture</span>
+                      </div>
+                    </td>
+                    <td><span class="tag-tech">AI / Automation</span></td>
+                    <td>SEED STAGE</td>
+                    <td><span class="mono-val">100.00 PTS</span></td>
+                    <td><span class="trend-neutral">0.0% ▬</span></td>
+                    <td><span class="status-badge">VALUING</span></td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <div class="ticker-cell">
+                        <span class="ticker-code">STARTUP 04</span>
+                        <span class="ticker-sub">Placeholder Venture</span>
+                      </div>
+                    </td>
+                    <td><span class="tag-tech">Sustainability</span></td>
+                    <td>IDEATION</td>
+                    <td><span class="mono-val">100.00 PTS</span></td>
+                    <td><span class="trend-up">+5.6% ▲</span></td>
+                    <td><span class="status-badge active">PITCHING</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="terminal-footer-notice">
+              <span class="notice-icon">ℹ</span>
+              <span>Architecture ready for future EIC Stock Game integration. Data entries above are non-numerical simulation placeholders.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. EIC MEMBERS -->
+      <section id="team" class="section glass-section">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-tag">[ 07 // PEOPLE ]</span>
+            <h2 class="section-title">EIC MEMBERS</h2>
+            <p class="section-subtitle">The student leads, coordinators, and innovators driving the EIC ecosystem at IIIT Una.</p>
+          </div>
+
+          <div class="team-grid">
+            <div class="member-card">
+              <div class="member-avatar-placeholder">
+                <span class="avatar-icon">👤</span>
+                <span class="avatar-tag">COORDINATOR</span>
+              </div>
+              <h3 class="member-name">MEMBER SLOT 01</h3>
+              <span class="member-role">Team Lead / Coordinator</span>
+              <p class="member-domain">Domain: Operations & Strategy</p>
+              <div class="member-socials">
+                <span class="social-chip">[ LINKEDIN ]</span>
+                <span class="social-chip">[ GITHUB ]</span>
+              </div>
+            </div>
+
+            <div class="member-card">
+              <div class="member-avatar-placeholder">
+                <span class="avatar-icon">👤</span>
+                <span class="avatar-tag">TECHNICAL LEAD</span>
+              </div>
+              <h3 class="member-name">MEMBER SLOT 02</h3>
+              <span class="member-role">Incubation Technical Lead</span>
+              <p class="member-domain">Domain: Product & Tech</p>
+              <div class="member-socials">
+                <span class="social-chip">[ LINKEDIN ]</span>
+                <span class="social-chip">[ GITHUB ]</span>
+              </div>
+            </div>
+
+            <div class="member-card">
+              <div class="member-avatar-placeholder">
+                <span class="avatar-icon">👤</span>
+                <span class="avatar-tag">EVENTS LEAD</span>
+              </div>
+              <h3 class="member-name">MEMBER SLOT 03</h3>
+              <span class="member-role">E-Summit Lead Coordinator</span>
+              <p class="member-domain">Domain: Logistics & Outreach</p>
+              <div class="member-socials">
+                <span class="social-chip">[ LINKEDIN ]</span>
+                <span class="social-chip">[ GITHUB ]</span>
+              </div>
+            </div>
+
+            <div class="member-card">
+              <div class="member-avatar-placeholder">
+                <span class="avatar-icon">👤</span>
+                <span class="avatar-tag">PR & CREATIVE</span>
+              </div>
+              <h3 class="member-name">MEMBER SLOT 04</h3>
+              <span class="member-role">Design & PR Head</span>
+              <p class="member-domain">Domain: Media & Corporate PR</p>
+              <div class="member-socials">
+                <span class="social-chip">[ LINKEDIN ]</span>
+                <span class="social-chip">[ GITHUB ]</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. WHAT'S NEXT -->
+      <section id="next" class="section glass-section">
+        <div class="section-container">
+          <div class="section-header">
+            <span class="section-tag">[ 08 // ROADMAP ]</span>
+            <h2 class="section-title">WHAT'S NEXT?</h2>
+            <p class="section-subtitle">Upcoming initiatives in development for the EIC ecosystem.</p>
+          </div>
+
+          <div class="next-grid">
+            <div class="next-card">
+              <span class="next-badge">IN DEVELOPMENT</span>
+              <h3 class="next-title">Interactive Stock Game</h3>
+              <p class="next-desc">Simulated startup equity trading platform for IIIT Una students to invest virtual portfolio capital in student ventures.</p>
+            </div>
+            <div class="next-card">
+              <span class="next-badge">UPCOMING</span>
+              <h3 class="next-title">E-Summit Registration</h3>
+              <p class="next-desc">Public registration portal launch for keynote sessions, hackathons, and VC pitch desk sessions.</p>
+            </div>
+            <div class="next-card">
+              <span class="next-badge">PIPELINE</span>
+              <h3 class="next-title">New Incubator Cohort</h3>
+              <p class="next-desc">Applications opening for early-stage student founders seeking university incubation support.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. FOOTER -->
+      <footer class="footer">
+        <div class="footer-container">
+          <div class="footer-top">
+            <h2 class="footer-statement">BUILD SOMETHING THAT MOVES.</h2>
+          </div>
+
+          <div class="footer-main">
+            <div class="footer-brand">
+              <img src="/eic-logo.png" alt="EIC Logo" class="footer-logo" />
+              <div>
+                <h3 class="footer-title">EIC</h3>
+                <p class="footer-sub">Entrepreneurship and Incubation Cell</p>
+                <p class="footer-uni">IIIT Una</p>
+              </div>
+            </div>
+
+            <div class="footer-socials">
+              <span class="social-label">OFFICIAL HANDLES:</span>
+              <div class="social-links">
+                <a href="#" class="social-btn" title="Instagram">[ INSTAGRAM ]</a>
+                <a href="#" class="social-btn" title="LinkedIn">[ LINKEDIN ]</a>
+                <a href="#" class="social-btn" title="GitHub">[ GITHUB ]</a>
+                <a href="#" class="social-btn" title="X / Twitter">[ X / TWITTER ]</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer-bottom">
+            <p>© EIC IIIT Una. All rights reserved.</p>
+            <p class="footer-note">Elevate | Innovate | Create</p>
+          </div>
+        </div>
+      </footer>
+
+    </main>
 
     <script type="module" src="/src/main.js"></script>
   </body>

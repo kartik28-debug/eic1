@@ -1,7 +1,7 @@
 /**
  * NeonCity3D — Scroll-driven wireframe city scene
  * Plain JavaScript (ES modules) + Three.js
- * No mouse dependency. Scroll drives all animation.
+ * EIC IIIT Una Digital Ecosystem Backdrop
  */
 
 import * as THREE from 'three';
@@ -12,14 +12,11 @@ const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').mat
 // ─── Color constants ─────────────────────────────────────────────────────────
 const CYAN   = 0x00e5ff;
 const TEAL   = 0x00bcd4;
-const YELLOW = 0xc8b45a;
-const BG     = 0x060810;
+const YELLOW = 0xe0c253;
+const BG     = 0x050811;
 
 // ─── DOM refs ────────────────────────────────────────────────────────────────
-const canvas      = document.getElementById('city-canvas');
-const section     = document.getElementById('city-3d-section');
-const sticky      = document.getElementById('city-sticky');
-const progressBar = document.getElementById('scroll-progress-bar');
+const canvas = document.getElementById('city-canvas');
 
 // ─── Renderer ────────────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({
@@ -31,19 +28,19 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(BG, 1);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.85;
+renderer.toneMappingExposure = 0.88;
 
 // ─── Scene + Camera ──────────────────────────────────────────────────────────
 const scene = new THREE.Scene();
-scene.fog   = new THREE.FogExp2(BG, 0.026);
+scene.fog   = new THREE.FogExp2(BG, 0.024);
 
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 300);
 camera.position.set(0, 8, 40);
 
 // ─── Resize ──────────────────────────────────────────────────────────────────
 function onResize() {
-  const w = sticky.clientWidth;
-  const h = sticky.clientHeight;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
@@ -61,13 +58,13 @@ function lineMat(color, opacity = 1.0) {
 }
 
 // ─── Grid floor ──────────────────────────────────────────────────────────────
-const grid = new THREE.GridHelper(240, 72, 0x0a2030, 0x0a2030);
+const grid = new THREE.GridHelper(260, 78, 0x0a2030, 0x0a2030);
 grid.material.opacity    = 0.38;
 grid.material.transparent = true;
 grid.position.y = -2;
 scene.add(grid);
 
-// ─── Buildings ───────────────────────────────────────────────────────────────
+// ─── Buildings (Startups & Ecosystem Nodes) ─────────────────────────────────
 const buildings = []; // { group, baseX, baseZ, rotSpeed, floatAmp, floatPhase }
 
 function makeBuilding(x, z, w, d, h, color, opacity = 0.7) {
@@ -93,13 +90,13 @@ function makeBuilding(x, z, w, d, h, color, opacity = 0.7) {
 
   // Glowing base trim
   const trimGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(w + 0.06, 0.12, d + 0.06));
-  const trim    = new THREE.LineSegments(trimGeo, lineMat(color, 0.85));
+  const trim    = new THREE.LineSegments(trimGeo, lineMat(color, 0.88));
   trim.position.y = 0.06;
   group.add(trim);
 
   // Spire on tall buildings
   if (h > 13) {
-    const spireH = h * 0.13;
+    const spireH = h * 0.14;
     const sGeo   = new THREE.EdgesGeometry(new THREE.CylinderGeometry(0.04, 0.16, spireH, 4));
     const sMat   = lineMat(color === CYAN ? CYAN : YELLOW, 0.85);
     const spire  = new THREE.LineSegments(sGeo, sMat);
@@ -113,19 +110,19 @@ function makeBuilding(x, z, w, d, h, color, opacity = 0.7) {
 }
 
 const LAYOUT = [
-  // left cluster
+  // left cluster (Ideas & Workshops)
   [ -22, -5,  2.8, 2.8, 22, CYAN,   0.72],
   [ -18, -9,  2.0, 2.0, 14, TEAL,   0.55],
   [ -26,-10,  3.2, 3.2, 18, CYAN,   0.50],
   [ -15, -3,  1.6, 1.6,  9, TEAL,   0.45],
   [ -20,  2,  2.2, 2.2, 16, YELLOW, 0.45],
-  // right cluster
+  // right cluster (E-Summit & Bech Ke Dikhao)
   [  22, -5,  2.8, 2.8, 24, TEAL,   0.72],
   [  18, -9,  2.0, 2.0, 13, CYAN,   0.55],
   [  26,-10,  3.2, 3.2, 17, TEAL,   0.50],
   [  14, -3,  1.6, 1.6, 10, CYAN,   0.45],
   [  21,  2,  2.2, 2.2, 15, YELLOW, 0.45],
-  // centre-back (distant)
+  // centre-back (EIC Main Towers)
   [  -8,-28,  3.5, 3.5, 28, CYAN,   0.35],
   [   0,-32,  4.0, 4.0, 32, TEAL,   0.30],
   [   9,-28,  3.5, 3.5, 26, CYAN,   0.35],
@@ -153,8 +150,8 @@ LAYOUT.forEach(([x, z, w, d, h, color, op], i) => {
   });
 });
 
-// ─── Floating Spheres ────────────────────────────────────────────────────────
-const spheres = []; // { mesh, orbitR, orbitSpeed, orbitPhase, orbitY, baseX, baseZ, floatAmp, floatPhase }
+// ─── Floating Spheres (Opportunities / Nodes) ────────────────────────────────
+const spheres = [];
 const sphGeo  = new THREE.SphereGeometry(0.22, 10, 8);
 
 const SPHERES = [
@@ -186,8 +183,8 @@ SPHERES.forEach(([bx, bz, orbitY, color, orbitR, orbitSpeed], i) => {
   });
 });
 
-// ─── Arc trails ──────────────────────────────────────────────────────────────
-const arcs = []; // { line, points, progress, speed, trailLen }
+// ─── Arc trails (Capital & Knowledge Pipelines) ──────────────────────────────
+const arcs = [];
 
 function buildArc(fx, fy, fz, tx, ty, tz, lift, color) {
   const from = new THREE.Vector3(fx, fy, fz);
@@ -195,8 +192,8 @@ function buildArc(fx, fy, fz, tx, ty, tz, lift, color) {
   const mid  = from.clone().lerp(to, 0.5);
   mid.y += lift;
 
-  const N    = 64;
-  const pts  = [];
+  const N   = 64;
+  const pts = [];
   for (let i = 0; i <= N; i++) {
     const t  = i / N;
     const t1 = 1 - t;
@@ -208,16 +205,26 @@ function buildArc(fx, fy, fz, tx, ty, tz, lift, color) {
   }
 
   const trailLen = Math.floor(N * 0.32);
-  const geom     = new THREE.BufferGeometry().setFromPoints(pts.slice(0, trailLen));
-  const mat      = lineMat(color, 0.78);
-  const line     = new THREE.Line(geom, mat);
+  const maxPoints = trailLen + 1;
+  const positions = new Float32Array(maxPoints * 3);
+  
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geom.setDrawRange(0, 0);
+
+  const mat  = lineMat(color, 0.78);
+  const line = new THREE.Line(geom, mat);
   scene.add(line);
 
   arcs.push({
-    line, pts,
+    line,
+    geom,
+    posAttr: geom.attributes.position,
+    pts,
     progress: Math.random(),
     speed:    0.0018 + Math.random() * 0.0012,
     trailLen,
+    maxPoints
   });
 }
 
@@ -238,11 +245,11 @@ ARCS.forEach(d => buildArc(...d));
 
 // ─── Camera keyframe path ────────────────────────────────────────────────────
 const CAM_KEYS = [
-  { p: [  0,  8,  40], l: [0,  4,   0] },  // 0%
-  { p: [ -6,  6,  22], l: [0,  8,  -8] },  // 25%
-  { p: [  0, 12,   8], l: [0, 10, -20] },  // 50%
-  { p: [  8,  5,  -4], l: [0,  6, -20] },  // 75%
-  { p: [  0,  3, -15], l: [0, 14, -32] },  // 100%
+  { p: [  0,  8,  40], l: [0,  4,   0] },  // 0%   - Hero
+  { p: [ -6,  6,  22], l: [0,  8,  -8] },  // 25%  - About / Ecosystem
+  { p: [  0, 12,   8], l: [0, 10, -20] },  // 50%  - E-Summit / Bech Ke Dikhao
+  { p: [  8,  5,  -4], l: [0,  6, -20] },  // 75%  - EIC Market Terminal
+  { p: [  0,  3, -15], l: [0, 14, -32] },  // 100% - Team & Roadmap
 ];
 
 const _tPos  = new THREE.Vector3();
@@ -267,26 +274,30 @@ function sampleCam(t) {
   _tLook.copy(_aLook).lerp(_bLook, f);
 }
 
-// ─── Scroll state ────────────────────────────────────────────────────────────
+// ─── Scroll state across whole page ──────────────────────────────────────────
 let scrollRaw    = 0;
 let scrollLerped = 0;
 
 function updateScroll() {
-  const rect    = section.getBoundingClientRect();
-  const total   = section.scrollHeight - window.innerHeight;
-  const scrolled = Math.max(0, -rect.top);
-  scrollRaw = Math.min(1, Math.max(0, scrolled / total));
-
-  if (progressBar) progressBar.style.width = `${scrollRaw * 100}%`;
-
-  const labels = document.querySelectorAll('.overlay-label');
-  const n      = labels.length;
-  labels.forEach((el, idx) => {
-    const phase = idx / Math.max(n - 1, 1);
-    el.classList.toggle('active', Math.abs(scrollRaw - phase) < 0.15);
-  });
+  const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
+  if (totalScroll > 0) {
+    scrollRaw = Math.min(1, Math.max(0, window.scrollY / totalScroll));
+  }
 }
 window.addEventListener('scroll', updateScroll, { passive: true });
+updateScroll();
+
+// ─── Cinematic Intro State ────────────────────────────────────────────────────
+let introPlaying = true;
+let introStartTime = null;
+const INTRO_DURATION = 7.0; // 7 seconds intro camera flythrough
+const OUTRO_TRANSITION_DURATION = 2.0; // 2 seconds smooth return to scroll position
+let outroStartTime = null;
+let introFinished = false;
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 // ─── Static render for reduced-motion ────────────────────────────────────────
 if (REDUCED_MOTION) {
@@ -302,48 +313,82 @@ if (REDUCED_MOTION) {
   function animate(time) {
     requestAnimationFrame(animate);
     const dt = Math.min((time - lastTime) / 16.67, 3);
-    lastTime  = time;
-    const t   = time * 0.001;
+    lastTime = time;
+    const t  = time * 0.001;
 
-    // Smooth scroll
-    scrollLerped += (scrollRaw - scrollLerped) * LERP * dt;
+    let currentProgress = 0;
 
-    // Camera
-    sampleCam(scrollLerped);
+    if (introPlaying) {
+      if (introStartTime === null) introStartTime = time;
+      const elapsed = (time - introStartTime) * 0.001;
+      const rawT = Math.min(1.0, elapsed / INTRO_DURATION);
+      currentProgress = easeInOutCubic(rawT);
+
+      if (rawT >= 1.0) {
+        introPlaying = false;
+        outroStartTime = time;
+      }
+    } else if (!introFinished) {
+      // Smoothly transition from 1.0 (end of intro) to actual current scrollRaw
+      const elapsedOutro = (time - outroStartTime) * 0.001;
+      const outroT = Math.min(1.0, elapsedOutro / OUTRO_TRANSITION_DURATION);
+      const easedOutro = easeInOutCubic(outroT);
+
+      currentProgress = THREE.MathUtils.lerp(1.0, scrollRaw, easedOutro);
+
+      if (outroT >= 1.0) {
+        introFinished = true;
+        scrollLerped = scrollRaw;
+      }
+    } else {
+      // Normal scroll-driven behavior
+      scrollLerped += (scrollRaw - scrollLerped) * LERP * dt;
+      currentProgress = scrollLerped;
+    }
+
+    // Camera positioning based on currentProgress
+    sampleCam(currentProgress);
     camPos.lerp(_tPos,  0.055 * dt);
     camLook.lerp(_tLook, 0.055 * dt);
     camera.position.copy(camPos);
     camera.lookAt(camLook);
 
-    // Buildings — float + tiny rotation + scroll parallax
+    // Buildings — ambient float + rotation + depth parallax
     buildings.forEach(b => {
       b.group.position.y = Math.sin(t + b.floatPhase) * b.floatAmp - 2;
       b.group.rotation.y += b.rotSpeed;
       const farFactor = Math.abs(b.baseZ) > 15 ? 0.20 : 0.07;
-      b.group.position.z = b.baseZ + scrollLerped * 32 * farFactor;
+      b.group.position.z = b.baseZ + currentProgress * 32 * farFactor;
     });
 
-    // Spheres — orbital + float + scroll lift
+    // Spheres — orbital + float + vertical lift
     spheres.forEach(s => {
       const angle = t * s.orbitSpeed * 1000 + s.orbitPhase;
       s.mesh.position.x = s.baseX + Math.cos(angle) * s.orbitR;
       s.mesh.position.z = s.baseZ + Math.sin(angle) * s.orbitR * 0.45;
       const liftFactor  = s.orbitY > 10 ? 0.14 : 0.08;
       s.mesh.position.y = s.orbitY + Math.sin(t + s.floatPhase) * s.floatAmp
-                          + scrollLerped * 8 * liftFactor;
+                          + currentProgress * 8 * liftFactor;
     });
 
-    // Arcs — animated trailing slice
+    // Arcs — continuous trailing animation
     arcs.forEach(a => {
       a.progress = (a.progress + a.speed) % 1;
       const n    = a.pts.length;
       const head = Math.floor(a.progress * n);
       const tail = Math.max(0, head - a.trailLen);
-      const slice = a.pts.slice(tail, head + 1);
-      if (slice.length >= 2) {
-        a.line.geometry.setFromPoints(slice);
-        a.line.geometry.attributes.position.needsUpdate = true;
+      const count = head - tail + 1;
+      
+      const posArr = a.posAttr.array;
+      for (let idx = 0; idx < count; idx++) {
+        const pt = a.pts[tail + idx];
+        posArr[idx * 3]     = pt.x;
+        posArr[idx * 3 + 1] = pt.y;
+        posArr[idx * 3 + 2] = pt.z;
       }
+      
+      a.geom.setDrawRange(0, count);
+      a.posAttr.needsUpdate = true;
     });
 
     renderer.render(scene, camera);
