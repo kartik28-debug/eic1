@@ -4,23 +4,158 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/eic-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EIC Game Hub — Entrepreneurship & Incubation Cell | IIIT Una</title>
-    <meta name="description" content="EIC IIIT Una Game Hub - Interactive entrepreneurial simulations and games." />
+    <title>EIC Stock Market & Game Hub — IIIT Una</title>
+    <meta name="description" content="EIC IIIT Una Game Hub - Interactive 3D stock market ecosystem and entrepreneurial games." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body class="games-page-body">
-    <main class="games-coming-container">
-      <div class="games-coming-card">
-        <span class="section-tag">[ EIC ARCADE ]</span>
-        <h1 class="games-hub-heading">EIC GAME HUB</h1>
-        <p class="games-coming-text">Games coming soon...</p>
-        <a href="index.html" class="btn btn-primary back-btn">
+  <body class="games-page">
+
+    <!-- ── 3D CANVAS BACKGROUND ── -->
+    <div id="games-canvas-container" class="games-canvas-bg">
+      <canvas id="games-canvas"></canvas>
+      <div class="grid-overlay-vignette"></div>
+    </div>
+
+    <!-- ── FLOATING NAVBAR ── -->
+    <header class="navbar games-navbar">
+      <div class="nav-container">
+        <a href="index.html" class="nav-brand">
+          <img src="/eic-logo.png" alt="EIC IIIT Una Logo" class="nav-logo" />
+          <div class="nav-brand-text">
+            <span class="brand-title">EIC</span>
+            <span class="brand-sub">GAME HUB</span>
+          </div>
+        </a>
+
+        <div class="status-pill nav-status">
+          <span class="status-dot"></span>
+          <span class="status-text">3D MARKET ENGINE ACTIVE</span>
+        </div>
+
+        <a href="index.html" class="btn btn-secondary back-eic-btn">
           <span>← BACK TO EIC</span>
         </a>
       </div>
-    </main>
+    </header>
+
+    <!-- ── LIVE TICKER TAPE BANNER ── -->
+    <div class="ticker-tape">
+      <div class="ticker-track">
+        <span class="ticker-item pos"><strong class="name">RELIANCE</strong> <span class="val">₹2,980.50</span> <span class="change">+2.43% ▲</span></span>
+        <span class="ticker-item pos"><strong class="name">TCS</strong> <span class="val">₹4,120.10</span> <span class="change">+1.21% ▲</span></span>
+        <span class="ticker-item pos"><strong class="name">INFY</strong> <span class="val">₹1,850.30</span> <span class="change">+0.89% ▲</span></span>
+        <span class="ticker-item neg"><strong class="name">HDFC</strong> <span class="val">₹1,640.00</span> <span class="change">-0.52% ▼</span></span>
+        <span class="ticker-item pos"><strong class="name">ADANI</strong> <span class="val">₹3,210.75</span> <span class="change">+3.12% ▲</span></span>
+        <span class="ticker-item neg"><strong class="name">ICICI</strong> <span class="val">₹1,120.40</span> <span class="change">-0.73% ▼</span></span>
+        <span class="ticker-item pos"><strong class="name">SBIN</strong> <span class="val">₹840.20</span> <span class="change">+1.05% ▲</span></span>
+        <span class="ticker-item pos"><strong class="name">NIFTY 50</strong> <span class="val">24,580</span> <span class="change">+1.34% ▲</span></span>
+        <span class="ticker-item pos"><strong class="name">SENSEX</strong> <span class="val">80,650</span> <span class="change">+1.29% ▲</span></span>
+      </div>
+    </div>
+
+    <!-- ── SCROLL CONTENT WRAPPER ── -->
+    <div class="games-scroll-wrapper">
+
+      <!-- SECTION 1: HERO OVERLAY (0-40% scroll) -->
+      <section class="games-hero-section">
+        <div class="games-intro-hero" id="intro-banner">
+          <span class="cyber-tag">[ 3D STOCK ECOSYSTEM ]</span>
+          <h1 class="hero-stock-title">
+            EXPLORE STOCKS<br />
+            <span class="highlight-text">MARKETS IN A NEW DIMENSION</span>
+          </h1>
+          <p class="hero-stock-desc">
+            Explore companies, track performance, and discover opportunities in an interactive 3D financial space.
+          </p>
+          <div class="hero-stock-actions">
+            <a href="#game-hub-section" class="btn btn-primary enter-btn">
+              <span>EXPLORE GAME HUB</span>
+              <span class="arrow">→</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="games-scroll-prompt" id="scroll-prompt">
+          <span class="scroll-text">SCROLL TO TRAVEL THROUGH STOCK CITY</span>
+          <div class="scroll-mouse"><div class="scroll-wheel"></div></div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: GAME HUB ARENAS (80-100% scroll) -->
+      <section class="games-hub-section" id="game-hub-section">
+        <div class="section-container">
+          <div class="section-header center">
+            <span class="section-tag">[ EIC ARCADE // ARENAS ]</span>
+            <h2 class="section-title">EIC GAME HUB</h2>
+            <p class="section-subtitle">Select an interactive simulation arena to test your financial & startup skills.</p>
+          </div>
+
+          <div class="games-arena-grid">
+            
+            <!-- ARENA 1: STOCK TRADER -->
+            <div class="arena-card active">
+              <div class="arena-badge ready">[ SIMULATION READY ]</div>
+              <div class="arena-icon">📈</div>
+              <h3 class="arena-title">EIC STOCK TRADER</h3>
+              <p class="arena-desc">
+                Simulated equity trading platform for IIIT Una students to invest virtual portfolio capital in student ventures and top stocks.
+              </p>
+              <div class="arena-tags">
+                <span>SIMULATION</span>
+                <span>REAL-TIME</span>
+                <span>PORTFOLIO</span>
+              </div>
+              <button class="btn btn-primary arena-btn" onclick="alert('EIC Stock Trader simulation launching in next update!')">
+                <span>ENTER STOCK TRADER</span>
+                <span>→</span>
+              </button>
+            </div>
+
+            <!-- ARENA 2: BECH KE DIKHAO -->
+            <div class="arena-card">
+              <div class="arena-badge upcoming">[ ARENA LOCKED ]</div>
+              <div class="arena-icon">🎯</div>
+              <h3 class="arena-title">BECH KE DIKHAO</h3>
+              <p class="arena-desc">
+                High-stakes live sales & elevator pitch arena where founders test product market viability under market pressure.
+              </p>
+              <div class="arena-tags">
+                <span>PITCHING</span>
+                <span>VALUATION</span>
+                <span>SALES</span>
+              </div>
+              <button class="btn btn-secondary arena-btn disabled" disabled>
+                <span>OPENING SOON</span>
+              </button>
+            </div>
+
+            <!-- ARENA 3: STARTUP INCUBATOR -->
+            <div class="arena-card">
+              <div class="arena-badge dev">[ IN DEVELOPMENT ]</div>
+              <div class="arena-icon">🚀</div>
+              <h3 class="arena-title">STARTUP INCUBATOR</h3>
+              <p class="arena-desc">
+                Multi-week incubator simulator taking student ventures from initial ideation to Series A seed funding.
+              </p>
+              <div class="arena-tags">
+                <span>STRATEGY</span>
+                <span>FUNDING</span>
+                <span>CAP TABLE</span>
+              </div>
+              <button class="btn btn-secondary arena-btn disabled" disabled>
+                <span>IN DEVELOPMENT</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <script type="module" src="/src/games-scene.js"></script>
   </body>
 </html>
