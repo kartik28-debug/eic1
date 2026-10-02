@@ -1544,6 +1544,37 @@ body.in-transition .content-wrapper {
   overflow-x: hidden;
 }
 
+/* INITIAL INTRO STATE - ONLY 3D CANVAS VISIBLE */
+body.in-intro {
+  overflow: hidden !important;
+}
+
+body.in-intro .games-navbar,
+body.in-intro .ticker-tape,
+body.in-intro .games-scroll-wrapper,
+body.in-intro .games-intro-hero,
+body.in-intro .games-scroll-prompt {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* REVEALED STATE (AFTER 3.5s INTRO + 0.3s PAUSE) */
+body.intro-complete {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+body.intro-complete .games-navbar,
+body.intro-complete .ticker-tape,
+body.intro-complete .games-scroll-wrapper,
+body.intro-complete .games-intro-hero {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
 .games-canvas-bg {
   position: fixed;
   top: 0;
@@ -1576,6 +1607,55 @@ body.in-transition .content-wrapper {
   font-size: 0.75rem;
   padding: 0.5rem 1.2rem;
 }
+
+/* Nav right group (back + logout + student name) */
+.nav-right-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.nav-student-name {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: 8px;
+  color: rgba(255, 100, 90, 0.8);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  padding: 0.42rem 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  background: rgba(255, 59, 48, 0.1);
+  border-color: rgba(255, 59, 48, 0.6);
+  color: #ff6b6b;
+  box-shadow: 0 0 12px rgba(255, 59, 48, 0.15);
+}
+
+.logout-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Games hub card is now a div — keep it clickable */
+.games-hub-card {
+  cursor: pointer;
+}
+
 
 /* LIVE TICKER TAPE BANNER */
 .ticker-tape {

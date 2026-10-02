@@ -448,7 +448,7 @@
             <p class="section-subtitle">Enter the EIC Game Hub — skill challenges, entrepreneurial simulations, and more.</p>
           </div>
 
-          <a href="games.html" class="games-hub-card" id="games-hub-card">
+          <div class="games-hub-card" id="games-hub-card" role="button" tabindex="0" onclick="eicEnterGames()" onkeydown="if(event.key==='Enter')eicEnterGames()">
             <div class="games-hub-inner">
               <div class="games-hub-icon">🎮</div>
               <h3 class="games-hub-title">GAMES</h3>
@@ -457,7 +457,24 @@
                 ENTER GAMES <span class="games-hub-arrow">→</span>
               </span>
             </div>
-          </a>
+          </div>
+          <script>
+            async function eicEnterGames() {
+              try {
+                const res = await fetch('http://localhost:5000/api/auth/me', { credentials: 'include' });
+                const data = await res.json();
+                if (data.authenticated && !data.mustChangePassword) {
+                  window.location.href = 'games.html';
+                } else if (data.authenticated && data.mustChangePassword) {
+                  window.location.href = 'change-password.html';
+                } else {
+                  window.location.href = 'login.html';
+                }
+              } catch (e) {
+                window.location.href = 'login.html';
+              }
+            }
+          </script>
         </div>
       </section>
 

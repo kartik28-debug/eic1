@@ -147,6 +147,9 @@ export function initGamesScene() {
   const canvas = document.getElementById('games-canvas');
   if (!canvas) return;
 
+  // Ensure scroll is at top on load
+  window.scrollTo(0, 0);
+
   // ─── Renderer ───
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -166,7 +169,7 @@ export function initGamesScene() {
 
   const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 400);
 
-  // Camera animation target points
+  // Camera target vector
   const camTarget = new THREE.Vector3(0, 12, 0);
 
   // ─── Lights ───
@@ -391,55 +394,86 @@ export function initGamesScene() {
   }
   scene.add(candleGroup);
 
-  // ─── ANIMATION & STATE MACHINE ───
-  let state = 'INTRO'; // 'INTRO' -> 'INTRO_COMPLETE' -> 'SCROLL_CONTROLLED'
+  // ─── STATE MACHINE ───
+  // States: "INTRO" -> "REVEAL" -> "SCROLL_CONTROLLED"
+  let sceneState = 'INTRO';
   let scrollProgress = 0;
 
-  // Camera initial position for Intro
-  camera.position.set(0, 55, 95);
+  // Initial Camera position for Establishing Shot (0.0s)
+  camera.position.set(0, 48, 85);
   camera.lookAt(camTarget);
 
-  // Intro overlay DOM element
-  const introBanner = document.getElementById('intro-banner');
   const scrollPrompt = document.getElementById('scroll-prompt');
 
-  // GSAP Intro Timeline
+  // Prevent scrolling during INTRO phase
+  function lockScrollHandler(e) {
+    if (sceneState !== 'SCROLL_CONTROLLED') {
+      window.scrollTo(0, 0);
+    }
+  }
+  window.addEventListener('scroll', lockScrollHandler, { passive: true });
+
+  // ─── EXACT 3.5 SECOND INTRO TIMELINE ───
   const introTl = gsap.timeline({
     onComplete: () => {
-      state = 'SCROLL_CONTROLLED';
-      document.body.classList.add('intro-complete');
-      if (scrollPrompt) {
-        scrollPrompt.style.opacity = '1';
-      }
+      sceneState = 'REVEAL';
+
+      // 0.3 SECOND CINEMATIC PAUSE BEFORE CONTENT REVEAL
+      gsap.delayedCall(0.3, () => {
+        sceneState = 'SCROLL_CONTROLLED';
+
+        // Reveal website UI content smoothly
+        document.body.classList.remove('in-intro');
+        document.body.classList.add('intro-complete');
+
+        if (scrollPrompt) {
+          scrollPrompt.style.opacity = '1';
+        }
+      });
     },
   });
 
   introTl
+    // 0.0s -> 0.8s: Wide establishing shot of 3D stock city
     .to(camera.position, {
-      x: 18,
-      y: 30,
-      z: 55,
-      duration: 2.2,
+      x: 16,
+      y: 32,
+      z: 60,
+      duration: 0.8,
+      ease: 'power1.inOut',
+      onUpdate: () => camera.lookAt(camTarget),
+    })
+    // 0.8s -> 1.8s: Fly into city between skyscrapers & glowing paths
+    .to(camera.position, {
+      x: -8,
+      y: 20,
+      z: 44,
+      duration: 1.0,
       ease: 'power2.inOut',
       onUpdate: () => camera.lookAt(camTarget),
     })
+    // 1.8s -> 2.8s: Approach central RELIANCE stock building
+    .to(camera.position, {
+      x: 0,
+      y: 15,
+      z: 34,
+      duration: 1.0,
+      ease: 'power2.out',
+      onUpdate: () => camera.lookAt(camTarget),
+    })
+    // 2.8s -> 3.5s: Final settling to hero position
     .to(camera.position, {
       x: 0,
       y: 14,
       z: 32,
-      duration: 2.3,
-      ease: 'power2.out',
+      duration: 0.7,
+      ease: 'power1.out',
       onUpdate: () => camera.lookAt(camTarget),
-    }, '-=0.4');
+    });
 
-  // Fade intro banner slightly as camera finishes
-  if (introBanner) {
-    introTl.to(introBanner, { opacity: 0.85, duration: 1 }, 1.5);
-  }
-
-  // ─── Scroll Handling ───
+  // ─── SCROLL SCRUBBING (Active ONLY after INTRO & REVEAL) ───
   function onScroll() {
-    if (state !== 'SCROLL_CONTROLLED') return;
+    if (sceneState !== 'SCROLL_CONTROLLED') return;
 
     const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
     if (maxScroll <= 0) return;
@@ -449,11 +483,10 @@ export function initGamesScene() {
 
   window.addEventListener('scroll', onScroll, { passive: true });
 
-  // ─── Camera Path Interpolation based on Scroll Progress ───
-  // Keyframe targets along scroll (0.0 to 1.0)
+  // ─── SCROLL CAMERA STAGES (0.0 to 1.0) ───
   const scrollCamPath = [
     { progress: 0.0, pos: new THREE.Vector3(0, 14, 32),   look: new THREE.Vector3(0, 12, 0) },
-    { progress: 0.25, pos: new THREE.Vector3(-12, 10, 22), look: new THREE.Vector3(-10, 10, -5) },
+    { progress: 0.25, pos: new THREE.Vector3(-14, 12, 22), look: new THREE.Vector3(-10, 10, -5) },
     { progress: 0.50, pos: new THREE.Vector3(0, 16, 12),   look: new THREE.Vector3(0, 14, -2) },
     { progress: 0.75, pos: new THREE.Vector3(14, 12, -2),  look: new THREE.Vector3(0, 8, -15) },
     { progress: 1.0,  pos: new THREE.Vector3(0, 8, -22),   look: new THREE.Vector3(0, 6, -45) },
@@ -463,9 +496,8 @@ export function initGamesScene() {
   const currentCamLook = new THREE.Vector3();
 
   function updateCameraScroll() {
-    if (state !== 'SCROLL_CONTROLLED') return;
+    if (sceneState !== 'SCROLL_CONTROLLED') return;
 
-    // Find bounding keyframes for scrollProgress
     let p1 = scrollCamPath[0];
     let p2 = scrollCamPath[scrollCamPath.length - 1];
 
@@ -480,7 +512,6 @@ export function initGamesScene() {
     const range = p2.progress - p1.progress;
     const factor = range > 0 ? (scrollProgress - p1.progress) / range : 0;
 
-    // Smooth lerp camera position and lookAt target
     currentCamPos.lerpVectors(p1.pos, p2.pos, factor);
     currentCamLook.lerpVectors(p1.look, p2.look, factor);
 

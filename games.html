@@ -11,7 +11,32 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
-  <body class="games-page">
+  <!-- ── AUTH GUARD (runs before page renders) ── -->
+  <script>
+    (async () => {
+      const API_BASE = 'http://localhost:5000';
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
+          credentials: 'include'
+        });
+        const data = await res.json();
+        if (!data.authenticated) {
+          window.location.replace('login.html');
+          return;
+        }
+        if (data.mustChangePassword) {
+          window.location.replace('change-password.html');
+          return;
+        }
+        // Store student info for the page to use
+        window._eicStudent = data.student;
+      } catch (e) {
+        // Backend unreachable — redirect to login
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+  <body class="games-page in-intro">
 
     <!-- ── 3D CANVAS BACKGROUND ── -->
     <div id="games-canvas-container" class="games-canvas-bg">
@@ -35,9 +60,15 @@
           <span class="status-text">3D MARKET ENGINE ACTIVE</span>
         </div>
 
-        <a href="index.html" class="btn btn-secondary back-eic-btn">
-          <span>← BACK TO EIC</span>
-        </a>
+        <div class="nav-right-group">
+          <span class="nav-student-name" id="nav-student-name"></span>
+          <a href="index.html" class="btn btn-secondary back-eic-btn">
+            <span>← BACK</span>
+          </a>
+          <button class="logout-btn" id="logout-btn" title="Logout">
+            <span>⏻ LOGOUT</span>
+          </button>
+        </div>
       </div>
     </header>
 
@@ -157,5 +188,34 @@
     </div>
 
     <script type="module" src="/src/games-scene.js"></script>
+
+    <script>
+      // ── Post-load auth UI setup ──
+      (function () {
+        const API_BASE = 'http://localhost:5000';
+
+        // Show student name in navbar once loaded
+        if (window._eicStudent) {
+          const nameEl = document.getElementById('nav-student-name');
+          if (nameEl) nameEl.textContent = window._eicStudent.name;
+        }
+
+        // Logout
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+          logoutBtn.addEventListener('click', async () => {
+            logoutBtn.disabled = true;
+            logoutBtn.textContent = 'LOGGING OUT...';
+            try {
+              await fetch(`${API_BASE}/api/auth/logout`, {
+                method: 'POST',
+                credentials: 'include'
+              });
+            } catch (e) { /* ignore */ }
+            window.location.replace('login.html');
+          });
+        }
+      })();
+    </script>
   </body>
 </html>
