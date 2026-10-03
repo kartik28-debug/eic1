@@ -184,8 +184,9 @@ function initSocketConnection() {
   socket.on('connect', () => {
     if (statusText) statusText.textContent = '● LIVE';
     if (statusPill) statusPill.classList.add('live');
-    if (activeGame && currentTeam) {
-      socket.emit('join-game-room', { gameId: activeGame.id, teamId: currentTeam.id });
+    // Rejoin game and team rooms on reconnect
+    if (activeGame) {
+      socket.emit('join-game-room', { gameId: activeGame.id, teamId: currentTeam ? currentTeam.id : null });
     }
   });
 
@@ -205,8 +206,27 @@ function initSocketConnection() {
     }
   });
 
-  socket.on('phase-changed', async ({ status, currentPhase, currentRound }) => {
+  // game-started: host pressed START GAME — move from lobby into game
+  socket.on('game-started', async ({ gameId, status, round, phase }) => {
+    console.log('[MM] game-started received:', { gameId, status, round, phase });
+    // Fetch authoritative state from backend then transition UI
     await loadInitialState();
+  });
+
+  socket.on('phase-changed', async ({ status, currentPhase, currentRound }) => {
+    console.log('[MM] phase-changed received:', { status, currentPhase, currentRound });
+    await loadInitialState();
+  });
+
+  socket.on('game-paused', () => {
+    // Visual indicator that timer is paused
+    const timerText = document.getElementById('hud-timer-text');
+    if (timerText) timerText.style.color = '#ffbd2e';
+  });
+
+  socket.on('game-resumed', () => {
+    const timerText = document.getElementById('hud-timer-text');
+    if (timerText) timerText.style.color = '#ff4d4d';
   });
 
   socket.on('timer-tick', ({ remainingSeconds }) => {
@@ -218,7 +238,7 @@ function initSocketConnection() {
   });
 
   socket.on('trade-executed', ({ newCashBalance }) => {
-    if (currentTeam) {
+    if (currentTeam && newCashBalance !== undefined) {
       currentTeam.cashBalance = newCashBalance;
     }
     refreshPlayerState();
@@ -253,10 +273,22 @@ function initSocketConnection() {
     showSebiModal(penaltyAmount, reason);
     refreshPlayerState();
   });
-}
+
+  socket.on('market-event-triggered', ({ message }) => {
+    // Show market event banner
+    const eventBanner = document.getElementById('mm-event-banner');
+    const eventContent = document.getElementById('mm-event-content');
+    if (eventBanner && eventContent) {
+      eventContent.innerHTML = `<div class="event-item"><p><strong>⚡ MARKET EVENT:</strong> ${message}</p></div>`;
+      eventBanner.classList.remove('hidden');
+    }
+  });
+
+} // end initSocketConnection
 
 // Load Initial Data & Route View
 async function loadInitialState() {
+
   try {
     // Show student name
     if (window._eicStudent) {
@@ -286,7 +318,7 @@ async function loadInitialState() {
     currentStocks = stateData.stocks || [];
     availableTips = stateData.availableTips || [];
     purchasedTips = stateData.purchasedTips || [];
-    holdings = stateData.holdings || [];
+    activeHoldings = stateData.holdings || [];
     currentLeaderboard = stateData.leaderboard || [];
 
     if (socket && socket.connected) {
@@ -879,6 +911,10 @@ async function handleCreateTeam() {
     }
 
     currentTeam = data.team;
+    // Join team's socket room for private events
+    if (socket && socket.connected && currentTeam) {
+      socket.emit('join-game-room', { gameId: currentTeam.gameId, teamId: currentTeam.id });
+    }
     renderLobbyWaitingRoom();
 
   } catch (e) {
@@ -913,6 +949,10 @@ async function handleJoinTeam() {
     }
 
     currentTeam = data.team;
+    // Join team's socket room for private events
+    if (socket && socket.connected && currentTeam) {
+      socket.emit('join-game-room', { gameId: currentTeam.gameId, teamId: currentTeam.id });
+    }
     renderLobbyWaitingRoom();
 
   } catch (e) {

@@ -21,12 +21,19 @@ async function initMarketMayhemSchema(pool) {
         sebi_check_round INT DEFAULT 4,
         current_round INT DEFAULT 1,
         current_phase VARCHAR(20) DEFAULT 'LOBBY',
+        allow_solo BOOLEAN DEFAULT TRUE,
         created_by INT REFERENCES students(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         started_at TIMESTAMP,
         ended_at TIMESTAMP
       );
     `);
+
+    // Safe migration: add allow_solo column if it does not already exist
+    await client.query(`
+      ALTER TABLE games ADD COLUMN IF NOT EXISTS allow_solo BOOLEAN DEFAULT TRUE;
+    `);
+
 
     // 2. teams table
     await client.query(`

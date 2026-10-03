@@ -24,13 +24,8 @@ function setupMarketMayhem(app, io, pool) {
 
   // Get or initialize active game
   async function getActiveGame() {
-    const res = await pool.query("SELECT * FROM games WHERE status != 'ENDED' ORDER BY id DESC LIMIT 1;");
-    if (res.rows.length > 0) {
-      return res.rows[0];
-    }
-    // Fallback: get the latest game
-    const latest = await pool.query("SELECT * FROM games ORDER BY id DESC LIMIT 1;");
-    return latest.rows[0] || null;
+    const res = await pool.query("SELECT * FROM games WHERE status NOT IN ('ENDED') ORDER BY id DESC LIMIT 1;");
+    return res.rows[0] || null;
   }
 
   // Get prices for a specific round (falls back to round 0 if current round price not yet revealed)
@@ -119,7 +114,8 @@ function setupMarketMayhem(app, io, pool) {
       currentRound: g.current_round,
       currentPhase: g.current_phase,
       timerSeconds: timerInfo,
-      leaderboard: leaderboard
+      leaderboard: leaderboard,
+      allowSolo: g.allow_solo
     });
   }
 
@@ -152,12 +148,14 @@ function setupMarketMayhem(app, io, pool) {
   function pauseRoundTimer(gameId) {
     if (activeTimers[gameId]) {
       activeTimers[gameId].isPaused = true;
+      io.to(`game_${gameId}`).emit('game-paused', { gameId });
     }
   }
 
   function resumeRoundTimer(gameId) {
     if (activeTimers[gameId]) {
       activeTimers[gameId].isPaused = false;
+      io.to(`game_${gameId}`).emit('game-resumed', { gameId });
     }
   }
 
@@ -684,19 +682,34 @@ function setupMarketMayhem(app, io, pool) {
 
       await client.query('COMMIT');
 
-      // Emit socket notification
-      io.to(`team_${teamId}`).emit('trade-executed', {
+      // Recalculate leaderboard for host monitor
+      const updatedLeaderboard = await getLeaderboard(game.id);
+
+      // Get team name for host display
+      const teamNameRes = await pool.query('SELECT team_name FROM teams WHERE id = $1;', [teamId]);
+      const teamName = teamNameRes.rows.length > 0 ? teamNameRes.rows[0].team_name : 'Team';
+
+      const tradePayload = {
         teamId,
+        teamName,
         stockTicker: stock.ticker,
+        stockName: stock.name,
         type: tradeType,
         quantity: qty,
         price,
-        totalValue: totalCost,
-        newCashBalance: cashBalance
-      });
+        totalAmount: totalCost,
+        newCashBalance: cashBalance,
+        createdAt: new Date().toISOString()
+      };
+
+      // Notify team members their own trade
+      io.to(`team_${teamId}`).emit('trade-executed', tradePayload);
+
+      // Notify host dashboard (game room) of live trade feed
+      io.to(`game_${game.id}`).emit('trade-executed', tradePayload);
 
       io.to(`game_${game.id}`).emit('leaderboard-updated', {
-        leaderboard: await getLeaderboard(game.id)
+        leaderboard: updatedLeaderboard
       });
 
       return res.json({
@@ -916,7 +929,7 @@ function setupMarketMayhem(app, io, pool) {
   // POST /api/market-mayhem/host/config — Configure game parameters
   app.post('/api/market-mayhem/host/config', requireHost, async (req, res) => {
     try {
-      const { startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound } = req.body;
+      const { startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound, allowSolo } = req.body;
       const game = await getActiveGame();
       if (!game) return res.status(404).json({ success: false, message: 'No game found' });
 
@@ -926,9 +939,11 @@ function setupMarketMayhem(app, io, pool) {
             max_team_size = COALESCE($2, max_team_size),
             round_timer_seconds = COALESCE($3, round_timer_seconds),
             penalty_percentage = COALESCE($4, penalty_percentage),
-            sebi_check_round = COALESCE($5, sebi_check_round)
-        WHERE id = $6;
-      `, [startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound, game.id]);
+            sebi_check_round = COALESCE($5, sebi_check_round),
+            allow_solo = COALESCE($6, allow_solo)
+        WHERE id = $7;
+      `, [startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound,
+          allowSolo !== undefined ? allowSolo : null, game.id]);
 
       await broadcastGameState(game.id);
       return res.json({ success: true, message: 'Game settings updated.' });
@@ -937,6 +952,7 @@ function setupMarketMayhem(app, io, pool) {
       res.status(500).json({ success: false, message: 'Server error' });
     }
   });
+
 
   // POST /api/market-mayhem/host/phase-change — Control game phase state machine
   app.post('/api/market-mayhem/host/phase-change', requireHost, async (req, res) => {
@@ -948,11 +964,18 @@ function setupMarketMayhem(app, io, pool) {
       let roundToSet = newRound || game.current_round;
       let phaseToSet = newPhase || game.current_phase;
       let statusToSet = game.status;
+      let isStartingGame = false;
 
       if (phaseToSet === 'START_GAME') {
+        // Validate: need at least one team
+        const teamsCount = await pool.query('SELECT COUNT(*) FROM teams WHERE game_id = $1;', [game.id]);
+        if (parseInt(teamsCount.rows[0].count) === 0) {
+          return res.status(400).json({ success: false, message: 'Cannot start: no teams have registered yet.' });
+        }
         statusToSet = 'ACTIVE';
         phaseToSet = 'BLOCK_DEAL';
         roundToSet = 1;
+        isStartingGame = true;
       } else if (phaseToSet === 'NEXT_ROUND') {
         if (roundToSet >= 5) {
           statusToSet = 'ENDED';
@@ -963,13 +986,28 @@ function setupMarketMayhem(app, io, pool) {
         }
       }
 
-      await pool.query(`
-        UPDATE games
-        SET status = $1, current_phase = $2, current_round = $3,
-            started_at = CASE WHEN $1 = 'ACTIVE' AND started_at IS NULL THEN CURRENT_TIMESTAMP ELSE started_at END,
-            ended_at = CASE WHEN $1 = 'ENDED' THEN CURRENT_TIMESTAMP ELSE ended_at END
-        WHERE id = $4;
-      `, [statusToSet, phaseToSet, roundToSet, game.id]);
+      // Fix: separate CASE logic to avoid PostgreSQL 42P08 type ambiguity
+      // Use explicit JS conditionals to build the final UPDATE
+      const now = new Date().toISOString();
+      const shouldSetStartedAt = (statusToSet === 'ACTIVE' && !game.started_at);
+      const shouldSetEndedAt = (statusToSet === 'ENDED');
+
+      if (shouldSetStartedAt) {
+        await pool.query(
+          `UPDATE games SET status = $1, current_phase = $2, current_round = $3, started_at = CURRENT_TIMESTAMP WHERE id = $4;`,
+          [statusToSet, phaseToSet, roundToSet, game.id]
+        );
+      } else if (shouldSetEndedAt) {
+        await pool.query(
+          `UPDATE games SET status = $1, current_phase = $2, current_round = $3, ended_at = CURRENT_TIMESTAMP WHERE id = $4;`,
+          [statusToSet, phaseToSet, roundToSet, game.id]
+        );
+      } else {
+        await pool.query(
+          `UPDATE games SET status = $1, current_phase = $2, current_round = $3 WHERE id = $4;`,
+          [statusToSet, phaseToSet, roundToSet, game.id]
+        );
+      }
 
       // If phase changes to REVEAL, execute price engine
       if (phaseToSet === 'REVEAL') {
@@ -981,14 +1019,26 @@ function setupMarketMayhem(app, io, pool) {
         startRoundTimer(game.id, game.round_timer_seconds);
       }
 
-      await broadcastGameState(game.id);
-
+      // Emit phase-changed to all participants
       io.to(`game_${game.id}`).emit('phase-changed', {
         gameId: game.id,
         status: statusToSet,
         currentPhase: phaseToSet,
         currentRound: roundToSet
       });
+
+      // If game was just started, emit dedicated game-started event
+      if (isStartingGame) {
+        io.to(`game_${game.id}`).emit('game-started', {
+          gameId: game.id,
+          status: statusToSet,
+          round: roundToSet,
+          phase: phaseToSet
+        });
+        console.log(`🚀 Game ${game.id} STARTED — emitting game-started to room game_${game.id}`);
+      }
+
+      await broadcastGameState(game.id);
 
       return res.json({
         success: true,
@@ -1000,7 +1050,7 @@ function setupMarketMayhem(app, io, pool) {
 
     } catch (err) {
       console.error('Phase change error:', err);
-      res.status(500).json({ success: false, message: 'Server error' });
+      res.status(500).json({ success: false, message: `Failed to change phase: ${err.message}` });
     }
   });
 
@@ -1042,6 +1092,72 @@ function setupMarketMayhem(app, io, pool) {
     }
   }
 
+  // GET /api/market-mayhem/game/:gameId/state — Player game state for a specific game
+  app.get('/api/market-mayhem/game/:gameId/state', async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ success: false, message: 'Not authenticated' });
+      }
+
+      const gameId = parseInt(req.params.gameId);
+      if (isNaN(gameId)) return res.status(400).json({ success: false, message: 'Invalid game ID.' });
+
+      const gameRes = await pool.query('SELECT * FROM games WHERE id = $1;', [gameId]);
+      if (gameRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Game not found.' });
+
+      const game = gameRes.rows[0];
+
+      // Find player's team in this game
+      const memberRes = await pool.query(`
+        SELECT tm.team_id, t.team_name, t.team_code, t.cash_balance
+        FROM team_members tm
+        JOIN teams t ON t.id = tm.team_id
+        WHERE tm.student_id = $1 AND t.game_id = $2;
+      `, [req.session.userId, gameId]);
+
+      let team = null;
+      let holdings = [];
+
+      if (memberRes.rows.length > 0) {
+        const t = memberRes.rows[0];
+        team = { id: t.team_id, name: t.team_name, code: t.team_code, cashBalance: parseFloat(t.cash_balance) };
+
+        const hRes = await pool.query(`
+          SELECT h.stock_id, h.quantity, s.name, s.ticker
+          FROM holdings h JOIN stocks s ON s.id = h.stock_id
+          WHERE h.team_id = $1 AND h.quantity > 0;
+        `, [team.id]);
+        holdings = hRes.rows;
+      }
+
+      const stocks = await getStockPrices(gameId, game.current_round);
+      const leaderboard = await getLeaderboard(gameId);
+      const timerInfo = activeTimers[gameId] ? activeTimers[gameId].remainingSeconds : game.round_timer_seconds;
+
+      return res.json({
+        success: true,
+        game: {
+          id: game.id,
+          name: game.name,
+          status: game.status,
+          currentRound: game.current_round,
+          currentPhase: game.current_phase,
+          startingCash: parseFloat(game.starting_cash),
+          roundTimerSeconds: game.round_timer_seconds,
+          timerRemaining: timerInfo,
+          allowSolo: game.allow_solo
+        },
+        team,
+        holdings,
+        stocks,
+        leaderboard
+      });
+    } catch (err) {
+      console.error('Game state error:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
   // POST /api/market-mayhem/host/market-event (Market Crash or Bull Run)
   app.post('/api/market-mayhem/host/market-event', requireHost, async (req, res) => {
     try {
@@ -1077,6 +1193,32 @@ function setupMarketMayhem(app, io, pool) {
 
     } catch (err) {
       console.error('Market event error:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // POST /api/market-mayhem/host/pause-timer
+  app.post('/api/market-mayhem/host/pause-timer', requireHost, async (req, res) => {
+    try {
+      const game = await getActiveGame();
+      if (!game) return res.status(404).json({ success: false, message: 'No game found' });
+      pauseRoundTimer(game.id);
+      return res.json({ success: true, message: 'Timer paused.' });
+    } catch (err) {
+      console.error('Pause timer error:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // POST /api/market-mayhem/host/resume-timer
+  app.post('/api/market-mayhem/host/resume-timer', requireHost, async (req, res) => {
+    try {
+      const game = await getActiveGame();
+      if (!game) return res.status(404).json({ success: false, message: 'No game found' });
+      resumeRoundTimer(game.id);
+      return res.json({ success: true, message: 'Timer resumed.' });
+    } catch (err) {
+      console.error('Resume timer error:', err);
       res.status(500).json({ success: false, message: 'Server error' });
     }
   });
@@ -1217,12 +1359,15 @@ function setupMarketMayhem(app, io, pool) {
   // ─── SOCKET.IO CONNECTIONS ────────────────────────────────
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   io.on('connection', (socket) => {
+    // Player or host joins the game room
     socket.on('join-game-room', ({ gameId, teamId }) => {
       if (gameId) {
         socket.join(`game_${gameId}`);
+        console.log(`Socket ${socket.id} joined room: game_${gameId}`);
       }
       if (teamId) {
         socket.join(`team_${teamId}`);
+        console.log(`Socket ${socket.id} joined room: team_${teamId}`);
       }
     });
 

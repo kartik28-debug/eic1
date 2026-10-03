@@ -104,6 +104,7 @@ function initHostSocket() {
 
   socket.on('connect', () => {
     if (hostActiveGame) {
+      // Use same room naming as server: game_<id>
       socket.emit('join-game-room', { gameId: hostActiveGame.id });
     }
   });
@@ -174,6 +175,11 @@ function updateHostHeader(game) {
   if (cfgPenalty) cfgPenalty.value = parseFloat(game.penalty_percentage);
   if (cfgSebi) cfgSebi.value = game.sebi_check_round;
 
+  // Sync allow_solo checkbox
+  const cfgAllowSolo = document.getElementById('cfg-allow-solo');
+  if (cfgAllowSolo) cfgAllowSolo.checked = (game.allow_solo !== false);
+
+
   const pricesRound = document.getElementById('host-prices-round');
   if (pricesRound) pricesRound.textContent = game.current_round;
 }
@@ -225,10 +231,30 @@ async function changePhase(newPhase) {
 }
 
 async function pauseTimer() {
-  alert('Timer paused');
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/pause-timer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-host-key': 'EIC_HOST_2026' },
+      credentials: 'include'
+    });
+    const data = await res.json();
+    alert(data.message || 'Timer paused.');
+  } catch (e) {
+    alert('Failed to pause timer.');
+  }
 }
 async function resumeTimer() {
-  alert('Timer resumed');
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/resume-timer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-host-key': 'EIC_HOST_2026' },
+      credentials: 'include'
+    });
+    const data = await res.json();
+    alert(data.message || 'Timer resumed.');
+  } catch (e) {
+    alert('Failed to resume timer.');
+  }
 }
 
 // Special Host Event Triggers
@@ -282,13 +308,15 @@ async function saveConfiguration() {
   const roundTimerSeconds = parseInt(document.getElementById('cfg-timer-seconds').value);
   const penaltyPercentage = parseFloat(document.getElementById('cfg-penalty-pct').value);
   const sebiCheckRound = parseInt(document.getElementById('cfg-sebi-round').value);
+  const allowSoloEl = document.getElementById('cfg-allow-solo');
+  const allowSolo = allowSoloEl ? allowSoloEl.checked : true;
 
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/config`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-host-key': 'EIC_HOST_2026' },
       credentials: 'include',
-      body: JSON.stringify({ startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound })
+      body: JSON.stringify({ startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound, allowSolo })
     });
     const data = await res.json();
     alert(data.message);
