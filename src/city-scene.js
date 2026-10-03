@@ -243,162 +243,57 @@ const ARCS = [
 
 ARCS.forEach(d => buildArc(...d));
 
-// ─── Camera keyframe path ────────────────────────────────────────────────────
-const CAM_KEYS = [
-  { p: [  0,  8,  40], l: [0,  4,   0] },  // 0%   - Hero
-  { p: [ -6,  6,  22], l: [0,  8,  -8] },  // 25%  - About / Ecosystem
-  { p: [  0, 12,   8], l: [0, 10, -20] },  // 50%  - E-Summit / Bech Ke Dikhao
-  { p: [  8,  5,  -4], l: [0,  6, -20] },  // 75%  - EIC Market Terminal
-  { p: [  0,  3, -15], l: [0, 14, -32] },  // 100% - Team & Roadmap
-];
+// ─── Fixed Camera Pose (Static Digital Backdrop) ────────────────────────────
+camera.position.set(0, 7, 34);
+camera.lookAt(0, 4, 0);
 
-const _tPos  = new THREE.Vector3();
-const _tLook = new THREE.Vector3();
-const _aPos  = new THREE.Vector3();
-const _aLook = new THREE.Vector3();
-const _bPos  = new THREE.Vector3();
-const _bLook = new THREE.Vector3();
-const camPos  = new THREE.Vector3(0, 8, 40);
-const camLook = new THREE.Vector3(0, 4, 0);
+// ─── Ambient Render Loop (No scroll camera movement or intro delays) ────────
+let lastTime = 0;
 
-function sampleCam(t) {
-  const N  = CAM_KEYS.length - 1;
-  const fi = Math.min(t * N, N - 0.0001);
-  const i  = Math.floor(fi);
-  const f  = fi - i;
-  const a  = CAM_KEYS[i];
-  const b  = CAM_KEYS[i + 1];
-  _aPos.set(...a.p); _bPos.set(...b.p);
-  _aLook.set(...a.l); _bLook.set(...b.l);
-  _tPos.copy(_aPos).lerp(_bPos, f);
-  _tLook.copy(_aLook).lerp(_bLook, f);
-}
-
-// ─── Scroll state across whole page ──────────────────────────────────────────
-let scrollRaw    = 0;
-let scrollLerped = 0;
-
-function updateScroll() {
-  const totalScroll = document.documentElement.scrollHeight - window.innerHeight;
-  if (totalScroll > 0) {
-    scrollRaw = Math.min(1, Math.max(0, window.scrollY / totalScroll));
-  }
-}
-window.addEventListener('scroll', updateScroll, { passive: true });
-updateScroll();
-
-// ─── State Machine: 'intro' | 'transition' | 'normal' ────────────────────────
-let sceneState = REDUCED_MOTION ? 'normal' : 'intro';
-let introStartTime = null;
-const INTRO_DURATION = 6.0; // 6 seconds full-screen cinematic camera journey
-
-let transitionStartTime = null;
-const TRANSITION_DURATION = 1.4; // 1.4 seconds smooth transition & content reveal
-
-function easeInOutCubic(t) {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-}
-
-// ─── Static render for reduced-motion ────────────────────────────────────────
-if (REDUCED_MOTION) {
-  sampleCam(0.15);
-  camera.position.copy(_tPos);
-  camera.lookAt(_tLook);
-  renderer.render(scene, camera);
-} else {
-  // ─── Animation loop ────────────────────────────────────────────────────────
-  let lastTime = 0;
-  const LERP   = 0.048;
-
-  function animate(time) {
-    requestAnimationFrame(animate);
-    const dt = Math.min((time - lastTime) / 16.67, 3);
-    lastTime = time;
-    const t  = time * 0.001;
-
-    let cameraProgress = 0;
-
-    if (sceneState === 'intro') {
-      if (introStartTime === null) {
-        introStartTime = time;
-        document.body.classList.add('in-intro');
-      }
-      const elapsed = (time - introStartTime) * 0.001;
-      const rawT = Math.min(1.0, elapsed / INTRO_DURATION);
-      cameraProgress = easeInOutCubic(rawT);
-
-      if (rawT >= 1.0) {
-        sceneState = 'transition';
-        transitionStartTime = time;
-        document.body.classList.remove('in-intro');
-        document.body.classList.add('in-transition');
-      }
-    } else if (sceneState === 'transition') {
-      const elapsed = (time - transitionStartTime) * 0.001;
-      const rawT = Math.min(1.0, elapsed / TRANSITION_DURATION);
-      const easedT = easeInOutCubic(rawT);
-
-      // Smoothly lerp camera progress from 1.0 (end of intro) to current scrollRaw
-      cameraProgress = THREE.MathUtils.lerp(1.0, scrollRaw, easedT);
-
-      if (rawT >= 1.0) {
-        sceneState = 'normal';
-        document.body.classList.remove('in-transition');
-        scrollLerped = scrollRaw;
-      }
-    } else {
-      // Normal scroll-driven behavior
-      scrollLerped += (scrollRaw - scrollLerped) * LERP * dt;
-      cameraProgress = scrollLerped;
-    }
-
-    // Camera positioning based on cameraProgress
-    sampleCam(cameraProgress);
-    camPos.lerp(_tPos,  0.055 * dt);
-    camLook.lerp(_tLook, 0.055 * dt);
-    camera.position.copy(camPos);
-    camera.lookAt(camLook);
-
-    // Buildings — ambient float + rotation + depth parallax
-    buildings.forEach(b => {
-      b.group.position.y = Math.sin(t + b.floatPhase) * b.floatAmp - 2;
-      b.group.rotation.y += b.rotSpeed;
-      const farFactor = Math.abs(b.baseZ) > 15 ? 0.20 : 0.07;
-      b.group.position.z = b.baseZ + cameraProgress * 32 * farFactor;
-    });
-
-    // Spheres — orbital + float + vertical lift
-    spheres.forEach(s => {
-      const angle = t * s.orbitSpeed * 1000 + s.orbitPhase;
-      s.mesh.position.x = s.baseX + Math.cos(angle) * s.orbitR;
-      s.mesh.position.z = s.baseZ + Math.sin(angle) * s.orbitR * 0.45;
-      const liftFactor  = s.orbitY > 10 ? 0.14 : 0.08;
-      s.mesh.position.y = s.orbitY + Math.sin(t + s.floatPhase) * s.floatAmp
-                          + cameraProgress * 8 * liftFactor;
-    });
-
-    // Arcs — continuous trailing animation
-    arcs.forEach(a => {
-      a.progress = (a.progress + a.speed) % 1;
-      const n    = a.pts.length;
-      const head = Math.floor(a.progress * n);
-      const tail = Math.max(0, head - a.trailLen);
-      const count = head - tail + 1;
-      
-      const posArr = a.posAttr.array;
-      for (let idx = 0; idx < count; idx++) {
-        const pt = a.pts[tail + idx];
-        posArr[idx * 3]     = pt.x;
-        posArr[idx * 3 + 1] = pt.y;
-        posArr[idx * 3 + 2] = pt.z;
-      }
-      
-      a.geom.setDrawRange(0, count);
-      a.posAttr.needsUpdate = true;
-    });
-
-    renderer.render(scene, camera);
-  }
-
+function animate(time) {
   requestAnimationFrame(animate);
+  const dt = Math.min((time - lastTime) / 16.67, 3);
+  lastTime = time;
+  const t = time * 0.001;
+
+  // Buildings — subtle rotation only (no scroll-driven parallax)
+  buildings.forEach(b => {
+    b.group.rotation.y += b.rotSpeed * dt;
+    b.group.position.z = b.baseZ;
+  });
+
+  // Spheres — orbital motion (no scroll lifting)
+  spheres.forEach(s => {
+    const angle = t * s.orbitSpeed * 1000 + s.orbitPhase;
+    s.mesh.position.x = s.baseX + Math.cos(angle) * s.orbitR;
+    s.mesh.position.z = s.baseZ + Math.sin(angle) * s.orbitR * 0.45;
+    s.mesh.position.y = s.orbitY;
+  });
+
+  // Arcs — trailing light paths
+  arcs.forEach(a => {
+    a.progress = (a.progress + a.speed * dt) % 1;
+    const n = a.pts.length;
+    const head = Math.floor(a.progress * n);
+    const tail = Math.max(0, head - a.trailLen);
+    const count = head - tail + 1;
+    
+    const posArr = a.posAttr.array;
+    for (let idx = 0; idx < count; idx++) {
+      const pt = a.pts[tail + idx];
+      posArr[idx * 3]     = pt.x;
+      posArr[idx * 3 + 1] = pt.y;
+      posArr[idx * 3 + 2] = pt.z;
+    }
+    
+    a.geom.setDrawRange(0, count);
+    a.posAttr.needsUpdate = true;
+  });
+
+  renderer.render(scene, camera);
 }
+
+// Render initial frame immediately
+renderer.render(scene, camera);
+requestAnimationFrame(animate);
+

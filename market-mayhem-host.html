@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/eic-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Host Dashboard — Market Mayhem</title>
+    <meta name="description" content="Host Control Dashboard for Market Mayhem Stock Market Simulation - EIC IIIT Una." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body class="games-page mm-host-page">
+
+    <!-- ── HOST NAVBAR ── -->
+    <header class="navbar games-navbar">
+      <div class="nav-container">
+        <a href="games.html" class="nav-brand">
+          <img src="/eic-logo.png" alt="EIC Logo" class="nav-logo" />
+          <div class="nav-brand-text">
+            <span class="brand-title">MARKET MAYHEM</span>
+            <span class="brand-sub">HOST CONTROL DASHBOARD</span>
+          </div>
+        </a>
+
+        <div class="status-pill nav-status">
+          <span class="status-dot"></span>
+          <span class="status-text">HOST ENGINE ONLINE</span>
+        </div>
+
+        <div class="nav-right-group">
+          <a href="games.html" class="btn btn-secondary back-eic-btn">
+            <span>← GAMES HUB</span>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main class="mm-main-container">
+
+      <!-- HOST AUTHORIZATION BOX -->
+      <section id="host-auth-section" class="mm-section">
+        <div class="mm-hero-card center-card" style="max-width: 480px;">
+          <div class="mm-badge">[ HOST AUTHORIZATION REQUIRED ]</div>
+          <h2>HOST LOGIN</h2>
+          <p class="mm-desc">Enter the Host Access Key to unlock the Market Mayhem game engine.</p>
+
+          <div class="form-group" style="margin-top: 1.5rem;">
+            <label>Host Access Key</label>
+            <input type="password" id="host-key-input" placeholder="Enter Host Key (e.g. EIC_HOST_2026)" value="EIC_HOST_2026" />
+          </div>
+
+          <button class="btn btn-primary" id="btn-host-login" style="width: 100%; justify-content: center; margin-top: 1.2rem;">
+            <span>UNLOCK HOST DASHBOARD</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- MAIN HOST CONTROL DASHBOARD -->
+      <section id="host-dashboard-section" class="mm-section hidden">
+
+        <!-- Host Header & Master Controls -->
+        <div class="mm-host-header-bar">
+          <div class="status-info">
+            <span class="cyber-tag">[ GAME CONTROL CENTER ]</span>
+            <h2 id="host-game-title">Market Mayhem Season 1</h2>
+            <div class="host-badge-row">
+              <span class="round-badge" id="host-round-badge">ROUND 1 / 5</span>
+              <span class="phase-badge" id="host-phase-badge">STATUS: LOBBY</span>
+              <span class="timer-badge" id="host-timer-badge">⏱ 02:00</span>
+            </div>
+          </div>
+
+          <!-- Phase Control Buttons -->
+          <div class="host-controls-group">
+            <button class="btn btn-primary" id="host-btn-start">🚀 START GAME</button>
+            <button class="btn btn-secondary" id="host-btn-next-phase">⏭ NEXT PHASE</button>
+            <button class="btn btn-outline" id="host-btn-pause-timer">⏸ PAUSE TIMER</button>
+            <button class="btn btn-outline" id="host-btn-resume-timer">▶ RESUME TIMER</button>
+            <button class="btn btn-secondary danger-btn" id="host-btn-end-game">🏁 END GAME</button>
+          </div>
+        </div>
+
+        <!-- Special Event Action Bar -->
+        <div class="host-actions-bar">
+          <button class="btn btn-secondary" id="host-btn-super-tip">⚡ ASSIGN RANDOM SUPER TIP</button>
+          <button class="btn btn-secondary" id="host-btn-sebi-check">🛡️ RUN SEBI REGULATORY CHECK</button>
+          <button class="btn btn-outline" id="host-btn-bull-run">📈 TRIGGER BULL RUN (+15% to +25%)</button>
+          <button class="btn btn-outline" id="host-btn-market-crash">📉 TRIGGER MARKET CRASH (-15% to -25%)</button>
+        </div>
+
+        <div class="mm-dashboard-grid">
+
+          <!-- Left Column: Config, Live Teams & Live Trades -->
+          <div class="mm-main-content-col">
+
+            <!-- Game Config Panel -->
+            <div class="host-card">
+              <h3>⚙️ GAME CONFIGURATION</h3>
+              <div class="config-grid">
+                <div class="form-group">
+                  <label>Starting Cash (₹)</label>
+                  <input type="number" id="cfg-starting-cash" value="100000" />
+                </div>
+                <div class="form-group">
+                  <label>Max Team Size</label>
+                  <input type="number" id="cfg-team-size" value="4" />
+                </div>
+                <div class="form-group">
+                  <label>Trading Timer (Seconds)</label>
+                  <input type="number" id="cfg-timer-seconds" value="120" />
+                </div>
+                <div class="form-group">
+                  <label>Penalty %</label>
+                  <input type="number" id="cfg-penalty-pct" value="10" />
+                </div>
+                <div class="form-group">
+                  <label>SEBI Check Round</label>
+                  <input type="number" id="cfg-sebi-round" value="4" />
+                </div>
+              </div>
+              <button class="btn btn-secondary" id="btn-save-config" style="margin-top: 1rem;">SAVE CONFIGURATION</button>
+            </div>
+
+            <!-- Registered Teams & Live Leaderboard Monitor -->
+            <div class="host-card">
+              <h3>👥 REGISTERED TEAMS & LIVE LEADERBOARD</h3>
+              <div class="table-responsive">
+                <table class="mm-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>TEAM NAME</th>
+                      <th>CODE</th>
+                      <th>MEMBERS</th>
+                      <th>CASH</th>
+                      <th>PORTFOLIO</th>
+                      <th>TOTAL VALUE</th>
+                    </tr>
+                  </thead>
+                  <tbody id="host-teams-tbody">
+                    <!-- Teams rendered live -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Live Trades & Market Activity -->
+            <div class="host-card">
+              <h3>📊 LIVE TRADES & TRANSACTIONS</h3>
+              <div class="table-responsive">
+                <table class="mm-table">
+                  <thead>
+                    <tr>
+                      <th>TIME</th>
+                      <th>TEAM</th>
+                      <th>TYPE</th>
+                      <th>STOCK</th>
+                      <th>QTY</th>
+                      <th>PRICE</th>
+                      <th>TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody id="host-trades-tbody">
+                    <tr>
+                      <td colspan="7" class="text-center">Awaiting player orders...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Column: Current Stocks & Tips Master -->
+          <div class="mm-sidebar-col">
+
+            <!-- Current Stock Prices -->
+            <div class="sidebar-box">
+              <h4>CURRENT STOCK PRICES (ROUND <span id="host-prices-round">1</span>)</h4>
+              <div class="host-prices-list" id="host-prices-list">
+                <!-- Stock prices -->
+              </div>
+            </div>
+
+            <!-- Master Tips Inspection (With Host Confidential Hidden Fields) -->
+            <div class="sidebar-box">
+              <h4>MASTER TIPS (HOST CONFIDENTIAL)</h4>
+              <div class="host-tips-list" id="host-tips-list">
+                <!-- Tips with is_true, effect_size, is_flagged -->
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+    <script type="module" src="/src/market-mayhem-host.js"></script>
+  </body>
+</html>

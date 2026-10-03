@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
@@ -6,8 +8,26 @@ const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
 require('dotenv').config();
 
+const { setupMarketMayhem } = require('./marketMayhemServer');
+const { initMarketMayhemSchema } = require('./db/marketMayhemSchema');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Create HTTP server & Socket.io
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: function (origin, callback) {
+      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true
+  }
+});
 
 // PostgreSQL Pool Connection (Neon database SSL configuration)
 const pool = new Pool({
@@ -17,11 +37,14 @@ const pool = new Pool({
     : { rejectUnauthorized: false }
 });
 
+// Auto-verify Market Mayhem DB Schema on startup
+initMarketMayhemSchema(pool).catch(err => {
+  console.error('Failed to initialize Market Mayhem DB Schema:', err);
+});
+
 // ─── Middleware ───
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests from any localhost port (Vite can pick 5173, 5174, etc.)
-    // Also allow no-origin requests (curl, Postman)
     if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       callback(null, true);
     } else {
@@ -33,7 +56,7 @@ app.use(cors({
 app.use(express.json());
 
 // ─── Session Store (PostgreSQL-backed) ───
-app.use(session({
+const sessionMiddleware = session({
   store: new pgSession({
     pool: pool,
     tableName: 'user_sessions',
@@ -48,11 +71,18 @@ app.use(session({
     secure: false, // set true in production with HTTPS
     sameSite: 'lax'
   }
-}));
+});
+
+app.use(sessionMiddleware);
+
+// Share session middleware with Socket.io
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, {}, next);
+});
 
 // ─── Root route ───
 app.get('/', (req, res) => {
-  res.json({ message: "EIC Backend is running" });
+  res.json({ message: "EIC Backend is running with Market Mayhem Multiplayer Engine" });
 });
 
 // ─── Database Connection Test ───
@@ -236,7 +266,12 @@ app.post('/api/auth/logout', (req, res) => {
   });
 });
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ─── MOUNT MARKET MAYHEM ENGINE ─────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+setupMarketMayhem(app, io, pool);
+
 // ─── Start Server ───
-app.listen(PORT, () => {
-  console.log(`EIC Backend server running on http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚀 EIC Backend & Market Mayhem Server running on http://localhost:${PORT}`);
 });

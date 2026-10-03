@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/eic-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EIC Stock Market & Game Hub — IIIT Una</title>
-    <meta name="description" content="EIC IIIT Una Game Hub - Interactive 3D stock market ecosystem and entrepreneurial games." />
+    <title>EIC Game Hub — IIIT Una</title>
+    <meta name="description" content="EIC IIIT Una Game Hub - Interactive stock market ecosystem and entrepreneurial games." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -36,13 +36,7 @@
       }
     })();
   </script>
-  <body class="games-page in-intro">
-
-    <!-- ── 3D CANVAS BACKGROUND ── -->
-    <div id="games-canvas-container" class="games-canvas-bg">
-      <canvas id="games-canvas"></canvas>
-      <div class="grid-overlay-vignette"></div>
-    </div>
+  <body class="games-page">
 
     <!-- ── FLOATING NAVBAR ── -->
     <header class="navbar games-navbar">
@@ -57,7 +51,7 @@
 
         <div class="status-pill nav-status">
           <span class="status-dot"></span>
-          <span class="status-text">3D MARKET ENGINE ACTIVE</span>
+          <span class="status-text">GAME HUB ACTIVE</span>
         </div>
 
         <div class="nav-right-group">
@@ -72,50 +66,8 @@
       </div>
     </header>
 
-    <!-- ── LIVE TICKER TAPE BANNER ── -->
-    <div class="ticker-tape">
-      <div class="ticker-track">
-        <span class="ticker-item pos"><strong class="name">RELIANCE</strong> <span class="val">₹2,980.50</span> <span class="change">+2.43% ▲</span></span>
-        <span class="ticker-item pos"><strong class="name">TCS</strong> <span class="val">₹4,120.10</span> <span class="change">+1.21% ▲</span></span>
-        <span class="ticker-item pos"><strong class="name">INFY</strong> <span class="val">₹1,850.30</span> <span class="change">+0.89% ▲</span></span>
-        <span class="ticker-item neg"><strong class="name">HDFC</strong> <span class="val">₹1,640.00</span> <span class="change">-0.52% ▼</span></span>
-        <span class="ticker-item pos"><strong class="name">ADANI</strong> <span class="val">₹3,210.75</span> <span class="change">+3.12% ▲</span></span>
-        <span class="ticker-item neg"><strong class="name">ICICI</strong> <span class="val">₹1,120.40</span> <span class="change">-0.73% ▼</span></span>
-        <span class="ticker-item pos"><strong class="name">SBIN</strong> <span class="val">₹840.20</span> <span class="change">+1.05% ▲</span></span>
-        <span class="ticker-item pos"><strong class="name">NIFTY 50</strong> <span class="val">24,580</span> <span class="change">+1.34% ▲</span></span>
-        <span class="ticker-item pos"><strong class="name">SENSEX</strong> <span class="val">80,650</span> <span class="change">+1.29% ▲</span></span>
-      </div>
-    </div>
-
-    <!-- ── SCROLL CONTENT WRAPPER ── -->
-    <div class="games-scroll-wrapper">
-
-      <!-- SECTION 1: HERO OVERLAY (0-40% scroll) -->
-      <section class="games-hero-section">
-        <div class="games-intro-hero" id="intro-banner">
-          <span class="cyber-tag">[ 3D STOCK ECOSYSTEM ]</span>
-          <h1 class="hero-stock-title">
-            EXPLORE STOCKS<br />
-            <span class="highlight-text">MARKETS IN A NEW DIMENSION</span>
-          </h1>
-          <p class="hero-stock-desc">
-            Explore companies, track performance, and discover opportunities in an interactive 3D financial space.
-          </p>
-          <div class="hero-stock-actions">
-            <a href="#game-hub-section" class="btn btn-primary enter-btn">
-              <span>EXPLORE GAME HUB</span>
-              <span class="arrow">→</span>
-            </a>
-          </div>
-        </div>
-
-        <div class="games-scroll-prompt" id="scroll-prompt">
-          <span class="scroll-text">SCROLL TO TRAVEL THROUGH STOCK CITY</span>
-          <div class="scroll-mouse"><div class="scroll-wheel"></div></div>
-        </div>
-      </section>
-
-      <!-- SECTION 2: GAME HUB ARENAS (80-100% scroll) -->
+    <!-- ── GAME HUB ARENAS ── -->
+    <main class="games-main">
       <section class="games-hub-section" id="game-hub-section">
         <div class="section-container">
           <div class="section-header center">
@@ -126,7 +78,27 @@
 
           <div class="games-arena-grid">
             
-            <!-- ARENA 1: STOCK TRADER -->
+            <!-- ARENA 1: MARKET MAYHEM (FLAGSHIP MULTIPLAYER GAME) -->
+            <div class="arena-card active" style="border-color: var(--cyan); box-shadow: 0 0 25px rgba(0, 229, 255, 0.2);">
+              <div class="arena-badge ready">[ MULTIPLAYER LIVE ]</div>
+              <div class="arena-icon">📊</div>
+              <h3 class="arena-title">MARKET MAYHEM</h3>
+              <p class="arena-desc">
+                High-stakes 5-round multiplayer stock trading simulation. Form teams, buy private insider tips, manage portfolios, and dominate the live leaderboard.
+              </p>
+              <div class="arena-tags">
+                <span>MULTIPLAYER</span>
+                <span>REAL-TIME</span>
+                <span>INSIDER TIPS</span>
+                <span>LEADERBOARD</span>
+              </div>
+              <a href="market-mayhem.html" class="btn btn-primary arena-btn">
+                <span>PLAY MARKET MAYHEM</span>
+                <span>→</span>
+              </a>
+            </div>
+
+            <!-- ARENA 2: STOCK TRADER -->
             <div class="arena-card active">
               <div class="arena-badge ready">[ SIMULATION READY ]</div>
               <div class="arena-icon">📈</div>
@@ -145,7 +117,7 @@
               </button>
             </div>
 
-            <!-- ARENA 2: BECH KE DIKHAO -->
+            <!-- ARENA 3: BECH KE DIKHAO -->
             <div class="arena-card">
               <div class="arena-badge upcoming">[ ARENA LOCKED ]</div>
               <div class="arena-icon">🎯</div>
@@ -163,7 +135,7 @@
               </button>
             </div>
 
-            <!-- ARENA 3: STARTUP INCUBATOR -->
+            <!-- ARENA 4: STARTUP INCUBATOR -->
             <div class="arena-card">
               <div class="arena-badge dev">[ IN DEVELOPMENT ]</div>
               <div class="arena-icon">🚀</div>
@@ -184,10 +156,7 @@
           </div>
         </div>
       </section>
-
-    </div>
-
-    <script type="module" src="/src/games-scene.js"></script>
+    </main>
 
     <script>
       // ── Post-load auth UI setup ──

@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/eic-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Market Mayhem — EIC Stock Market Simulation</title>
+    <meta name="description" content="Market Mayhem - Classroom stock market simulation game by EIC IIIT Una." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <!-- ── AUTH GUARD (runs before page renders) ── -->
+  <script>
+    (async () => {
+      const API_BASE = 'http://localhost:5000';
+      try {
+        const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+        const data = await res.json();
+        if (!data.authenticated) {
+          window.location.replace('login.html');
+          return;
+        }
+        if (data.mustChangePassword) {
+          window.location.replace('change-password.html');
+          return;
+        }
+        window._eicStudent = data.student;
+      } catch (e) {
+        window.location.replace('login.html');
+      }
+    })();
+  </script>
+  <body class="games-page mm-page">
+
+    <!-- ── FLOATING NAVBAR ── -->
+    <header class="navbar games-navbar">
+      <div class="nav-container">
+        <a href="games.html" class="nav-brand">
+          <img src="/eic-logo.png" alt="EIC Logo" class="nav-logo" />
+          <div class="nav-brand-text">
+            <span class="brand-title">MARKET MAYHEM</span>
+            <span class="brand-sub">EIC SIMULATION ARENA</span>
+          </div>
+        </a>
+
+        <div class="status-pill nav-status" id="connection-status">
+          <span class="status-dot"></span>
+          <span class="status-text" id="status-text">CONNECTING...</span>
+        </div>
+
+        <div class="nav-right-group">
+          <button class="btn btn-secondary back-eic-btn" id="fact-sheet-nav-btn" style="padding: 0.4rem 0.8rem;">
+            <span>📄 FACT SHEET</span>
+          </button>
+          <span class="nav-student-name" id="nav-student-name"></span>
+          <a href="games.html" class="btn btn-secondary back-eic-btn">
+            <span>← GAMES HUB</span>
+          </a>
+          <button class="logout-btn" id="logout-btn" title="Logout">
+            <span>⏻ LOGOUT</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── MAIN CONTAINER ── -->
+    <main class="mm-main-container">
+
+      <!-- SECTION 1: LOBBY & TEAM MANAGEMENT (Shown when not in active game dashboard) -->
+      <section id="mm-lobby-section" class="mm-section">
+        <div class="mm-hero-card">
+          <div class="mm-badge">[ EIC MULTIPLAYER SIMULATION ]</div>
+          <h1 class="mm-title">MARKET MAYHEM</h1>
+          <p class="mm-subtitle">Learn. Trade. Survive the market.</p>
+          <p class="mm-desc">
+            Form your team, analyze stock fundamentals across 5 trading rounds, acquire high-stakes insider tips, and compete on the live leaderboard.
+          </p>
+
+          <!-- Choice Actions -->
+          <div class="mm-lobby-actions" id="mm-lobby-choices">
+            <button class="btn btn-primary" id="btn-show-create-team">
+              <span>➕ CREATE TEAM</span>
+            </button>
+            <button class="btn btn-secondary" id="btn-show-join-team">
+              <span>🔑 JOIN TEAM WITH CODE</span>
+            </button>
+            <button class="btn btn-outline" id="btn-view-factsheet">
+              <span>📊 VIEW STOCK FACT SHEET</span>
+            </button>
+          </div>
+
+          <!-- Create Team Form -->
+          <div class="mm-form-box hidden" id="mm-create-team-box">
+            <h3>CREATE NEW TEAM</h3>
+            <p class="form-sub">Generate a unique 5-character team code for your teammates.</p>
+            <div class="form-group">
+              <label>Your Display Name</label>
+              <input type="text" id="create-player-name" placeholder="Enter your name" />
+            </div>
+            <div class="form-group">
+              <label>Team Name</label>
+              <input type="text" id="create-team-name" placeholder="e.g. Market Mavericks" maxlength="30" />
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="submit-create-team">CREATE TEAM</button>
+              <button class="btn btn-outline" id="cancel-create-team">CANCEL</button>
+            </div>
+          </div>
+
+          <!-- Join Team Form -->
+          <div class="mm-form-box hidden" id="mm-join-team-box">
+            <h3>JOIN EXISTING TEAM</h3>
+            <p class="form-sub">Enter the 5-character team code shared by your team leader.</p>
+            <div class="form-group">
+              <label>Your Display Name</label>
+              <input type="text" id="join-player-name" placeholder="Enter your name" />
+            </div>
+            <div class="form-group">
+              <label>Team Code (5 Characters)</label>
+              <input type="text" id="join-team-code" placeholder="e.g. A7K3P" maxlength="5" style="text-transform: uppercase; letter-spacing: 0.2em; font-family: var(--font-mono);" />
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-primary" id="submit-join-team">JOIN TEAM</button>
+              <button class="btn btn-outline" id="cancel-join-team">CANCEL</button>
+            </div>
+          </div>
+
+          <!-- Team Waiting Room -->
+          <div class="mm-waiting-room hidden" id="mm-waiting-room">
+            <div class="waiting-header">
+              <span class="cyber-tag">[ TEAM LOBBY READY ]</span>
+              <h2 id="lobby-team-name">TEAM NAME</h2>
+              <div class="code-box">
+                <span class="code-label">SHARE TEAM CODE:</span>
+                <span class="code-val" id="lobby-team-code">XXXXX</span>
+                <button class="copy-btn" id="btn-copy-code" title="Copy Code">📋 COPY</button>
+              </div>
+            </div>
+
+            <div class="members-container">
+              <h4>TEAM MEMBERS (<span id="member-count">1</span>/4)</h4>
+              <ul class="member-list" id="lobby-member-list">
+                <!-- Dynamically populated -->
+              </ul>
+            </div>
+
+            <div class="host-waiting-notice">
+              <span class="pulse-dot"></span>
+              <span>Waiting for the Host to start Round 1...</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: ACTIVE GAME DASHBOARD -->
+      <section id="mm-dashboard-section" class="mm-section hidden">
+        
+        <!-- Game Status & Phase Header Bar -->
+        <div class="mm-game-header">
+          <div class="header-badge-group">
+            <span class="round-badge" id="hud-round-badge">ROUND 1 / 5</span>
+            <span class="phase-badge" id="hud-phase-badge">PHASE: TRADING</span>
+          </div>
+
+          <div class="timer-card" id="hud-timer-card">
+            <span class="timer-icon">⏱</span>
+            <span class="timer-text" id="hud-timer-text">02:00</span>
+          </div>
+        </div>
+
+        <!-- Financial Summary Bar -->
+        <div class="mm-financial-bar">
+          <div class="fin-card">
+            <span class="fin-label">AVAILABLE CASH</span>
+            <span class="fin-value cyan" id="fin-cash">₹1,00,000</span>
+          </div>
+          <div class="fin-card">
+            <span class="fin-label">PORTFOLIO VALUE</span>
+            <span class="fin-value" id="fin-portfolio">₹0</span>
+          </div>
+          <div class="fin-card highlight">
+            <span class="fin-label">TOTAL TEAM VALUE</span>
+            <span class="fin-value gold" id="fin-total">₹1,00,000</span>
+          </div>
+          <div class="fin-card">
+            <span class="fin-label">PROFIT / LOSS</span>
+            <span class="fin-value" id="fin-pnl">₹0 (0.00%)</span>
+          </div>
+        </div>
+
+        <!-- Round Event Announcement Banner -->
+        <div class="mm-event-banner hidden" id="mm-event-banner">
+          <div class="event-banner-tag">[ MARKET ANNOUNCEMENT ]</div>
+          <div class="event-banner-content" id="mm-event-content">
+            <!-- Dynamically populated news/block deal -->
+          </div>
+        </div>
+
+        <!-- Super Tip Alert Banner -->
+        <div class="mm-super-tip-banner hidden" id="mm-super-tip-banner">
+          <div class="super-tip-header">⚡ SUPER TIP ACQUIRED (PRIVATE TO YOUR TEAM)</div>
+          <div class="super-tip-body" id="super-tip-body"></div>
+        </div>
+
+        <!-- Dashboard Layout: Left Controls, Right Sidebar -->
+        <div class="mm-dashboard-grid">
+
+          <!-- Left Area: Tabs & Interactive Cards -->
+          <div class="mm-main-content-col">
+
+            <!-- Nav Tabs -->
+            <div class="mm-tabs">
+              <button class="mm-tab-btn active" data-tab="tab-trading">📈 TRADING ARENA</button>
+              <button class="mm-tab-btn" data-tab="tab-tips">💡 TIP SHOP & PRIVATE TIPS</button>
+              <button class="mm-tab-btn" data-tab="tab-chart">📊 STOCK PRICE GRAPH</button>
+            </div>
+
+            <!-- Tab 1: Trading Arena -->
+            <div class="tab-content active" id="tab-trading">
+              <div class="stocks-grid" id="stocks-arena-grid">
+                <!-- 5 Stock Cards Rendered Here -->
+              </div>
+            </div>
+
+            <!-- Tab 2: Tip Shop -->
+            <div class="tab-content" id="tab-tips">
+              <div class="tip-shop-container">
+                <div class="tip-shop-header">
+                  <h3>PRIVATE INSIDER TIP SHOP</h3>
+                  <p class="tip-sub">Spend team cash to gain early market intelligence. Max 2 tips per team per round.</p>
+                  <div class="tip-counter-pill" id="tip-counter-pill">TIPS BOUGHT THIS ROUND: 0 / 2</div>
+                </div>
+
+                <div class="available-tips-grid" id="available-tips-grid">
+                  <!-- Tips for current round -->
+                </div>
+
+                <div class="purchased-tips-section">
+                  <h4>YOUR TEAM'S PURCHASED TIPS</h4>
+                  <div class="purchased-tips-list" id="purchased-tips-list">
+                    <p class="empty-state">No tips purchased yet this round.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tab 3: Stock Price Chart -->
+            <div class="tab-content" id="tab-chart">
+              <div class="chart-card">
+                <h3>STOCK PRICE HISTORY (ROUNDS 0 – 5)</h3>
+                <div class="chart-container">
+                  <canvas id="stockPricesChart"></canvas>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Sidebar: Holdings & Live Leaderboard -->
+          <div class="mm-sidebar-col">
+
+            <!-- Holdings Box -->
+            <div class="sidebar-box">
+              <h4>YOUR TEAM HOLDINGS</h4>
+              <div class="holdings-list" id="holdings-list">
+                <p class="empty-state">No stock holdings yet. Buy stocks during the trading phase!</p>
+              </div>
+            </div>
+
+            <!-- Leaderboard Box -->
+            <div class="sidebar-box">
+              <div class="box-header">
+                <h4>LIVE LEADERBOARD</h4>
+                <span class="live-dot">●</span>
+              </div>
+              <div class="leaderboard-table-wrapper">
+                <table class="mm-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>TEAM</th>
+                      <th>TOTAL VALUE</th>
+                    </tr>
+                  </thead>
+                  <tbody id="leaderboard-tbody">
+                    <!-- Leaderboard Rows -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Trade History Stream -->
+            <div class="sidebar-box">
+              <h4>TEAM RECENT TRADES</h4>
+              <div class="trades-stream" id="trades-stream">
+                <p class="empty-state">No trades executed yet.</p>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- SECTION 3: REVEAL OVERLAY MODAL -->
+      <div class="mm-modal-overlay hidden" id="reveal-modal">
+        <div class="mm-modal-card">
+          <div class="modal-badge">[ ROUND REVEAL ]</div>
+          <h2 id="reveal-title">ROUND REVEAL</h2>
+          <div class="reveal-prices-grid" id="reveal-prices-grid">
+            <!-- Price updates -->
+          </div>
+          <button class="btn btn-primary" id="btn-close-reveal">CONTINUE TO GAME</button>
+        </div>
+      </div>
+
+      <!-- SECTION 4: SEBI PENALTY MODAL -->
+      <div class="mm-modal-overlay hidden" id="sebi-modal">
+        <div class="mm-modal-card warning-card">
+          <div class="modal-badge danger">[ REGULATORY CHECK // SEBI ]</div>
+          <h2>⚠️ INSIDER TRADING PENALTY</h2>
+          <p class="modal-desc" id="sebi-modal-desc">
+            A flagged stock was traded after your team purchased a flagged insider tip.
+          </p>
+          <div class="penalty-box">
+            <span class="pen-label">PENALTY DEDUCTION</span>
+            <span class="pen-val" id="sebi-penalty-amount">-₹10,000</span>
+          </div>
+          <p class="pen-note">
+            Educational Note: Trading on non-public inside information creates unfair market advantage and violates regulatory standards.
+          </p>
+          <button class="btn btn-primary" id="btn-close-sebi">ACKNOWLEDGE</button>
+        </div>
+      </div>
+
+      <!-- SECTION 5: FINAL RESULTS & DEBRIEF SECTION -->
+      <section id="mm-results-section" class="mm-section hidden">
+        <div class="mm-results-card">
+          <div class="results-header">
+            <span class="cyber-tag">[ GAME ENDED // FINAL RANKINGS ]</span>
+            <h1>MARKET MAYHEM RESULTS</h1>
+            <p>Congratulations to all teams for completing the 5-round stock market simulation!</p>
+          </div>
+
+          <!-- Podium / Leaderboard -->
+          <div class="final-podium-grid" id="final-podium-grid">
+            <!-- Top 3 Teams -->
+          </div>
+
+          <!-- Team Performance Graph -->
+          <div class="results-chart-box">
+            <h3>ROUND-BY-ROUND TEAM PORTFOLIO PERFORMANCE</h3>
+            <div class="chart-container">
+              <canvas id="teamValueChart"></canvas>
+            </div>
+          </div>
+
+          <!-- TIP DEBRIEF TABLE -->
+          <div class="debrief-box">
+            <h3>💡 FULL INSIDER TIP DEBRIEF</h3>
+            <p class="debrief-sub">Reveal of hidden tip parameters, truth values, and actual stock price impact.</p>
+            <div class="debrief-table-wrapper">
+              <table class="mm-table debrief-table">
+                <thead>
+                  <tr>
+                    <th>RD</th>
+                    <th>SOURCE</th>
+                    <th>STOCK</th>
+                    <th>TIP TEXT</th>
+                    <th>TRUTH</th>
+                    <th>IMPACT</th>
+                    <th>SEBI FLAGGED</th>
+                  </tr>
+                </thead>
+                <tbody id="debrief-tbody">
+                  <!-- Debrief rows -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="results-actions">
+            <a href="games.html" class="btn btn-primary">RETURN TO GAMES HUB</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- STOCK FACT SHEET MODAL -->
+      <div class="mm-modal-overlay hidden" id="factsheet-modal">
+        <div class="mm-modal-card wide-card">
+          <div class="modal-header-row">
+            <h2>MARKET MAYHEM — STOCK FACT SHEET</h2>
+            <button class="close-icon-btn" id="close-factsheet">✕</button>
+          </div>
+          <p class="fact-sub">Review company fundamentals, market sectors, volatility ratings, and 6-month historical prices.</p>
+          <div class="factsheet-grid" id="factsheet-stocks-container">
+            <!-- Fact Sheet Cards -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TRADE MODAL -->
+      <div class="mm-modal-overlay hidden" id="trade-modal">
+        <div class="mm-modal-card">
+          <h2 id="trade-modal-title">EXECUTE TRADE</h2>
+          <div class="trade-info-box">
+            <div class="info-row"><span>Stock:</span> <strong id="trade-stock-name">--</strong></div>
+            <div class="info-row"><span>Current Price:</span> <strong id="trade-stock-price" class="cyan">₹0</strong></div>
+            <div class="info-row"><span>Available Cash:</span> <span id="trade-avail-cash">₹0</span></div>
+            <div class="info-row"><span>Owned Shares:</span> <span id="trade-owned-qty">0</span></div>
+          </div>
+          <div class="trade-inputs">
+            <div class="trade-type-toggle">
+              <button class="toggle-btn active" id="trade-btn-buy">BUY</button>
+              <button class="toggle-btn" id="trade-btn-sell">SELL</button>
+            </div>
+            <div class="form-group">
+              <label>Quantity</label>
+              <input type="number" id="trade-quantity-input" min="1" value="10" />
+            </div>
+            <div class="est-val-row">
+              <span>Estimated Total:</span>
+              <strong id="trade-est-total" class="gold">₹0</strong>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" id="btn-submit-trade">CONFIRM TRADE</button>
+            <button class="btn btn-outline" id="btn-cancel-trade">CANCEL</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <script type="module" src="/src/market-mayhem.js"></script>
+  </body>
+</html>
