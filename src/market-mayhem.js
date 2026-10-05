@@ -641,7 +641,7 @@ function renderTipShop(tips) {
   const boughtCount = purchasedTips.filter(t => t.round_number === activeGame.currentRound).length;
   if (pill) pill.textContent = `TIPS BOUGHT THIS ROUND: ${boughtCount} / 2`;
 
-  const isTipPhase = activeGame && (activeGame.currentPhase === 'TIP_SHOP' || activeGame.currentPhase === 'TRADING');
+  const isTipPhase = activeGame && activeGame.currentPhase === 'TIP_SHOP';
 
   container.innerHTML = tips.map(tip => {
     const isBought = purchasedTips.some(pt => pt.tip_id === tip.id);
@@ -649,9 +649,9 @@ function renderTipShop(tips) {
     return `
       <div class="tip-card ${tip.is_super_tip ? 'super-tip' : ''}">
         ${tip.is_super_tip ? '<span class="super-badge">⚡ SUPER TIP</span>' : ''}
-        <div class="tip-source">Source: <strong>${tip.source_label}</strong></div>
+        <div class="tip-source">PRIVATE INTEL</div>
         <div class="tip-stock-tag">Linked Stock: ${tip.stock_name} (${tip.stock_ticker})</div>
-        <p class="tip-preview">"${tip.text}"</p>
+        <p class="tip-preview">${isBought ? 'TIP UNLOCKED' : '🔒 CLASSIFIED — PURCHASE TO REVEAL'}</p>
         <div class="tip-price">Cost: ₹${parseFloat(tip.price).toLocaleString('en-IN')}</div>
         
         <button class="btn ${tip.is_super_tip ? 'btn-primary' : 'btn-secondary'} buy-tip-btn"
