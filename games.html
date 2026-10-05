@@ -1,190 +1,202 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/eic-logo.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EIC Game Hub — IIIT Una</title>
-    <meta name="description" content="EIC IIIT Una Game Hub - Interactive stock market ecosystem and entrepreneurial games." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/src/style.css" />
-  </head>
-  <!-- ── AUTH GUARD (runs before page renders) ── -->
-  <script>
-    (async () => {
-      const API_BASE = 'http://localhost:5000';
-      try {
-        const res = await fetch(`${API_BASE}/api/auth/me`, {
-          credentials: 'include'
-        });
-        const data = await res.json();
-        if (!data.authenticated) {
-          window.location.replace('login.html');
-          return;
-        }
-        if (data.mustChangePassword) {
-          window.location.replace('change-password.html');
-          return;
-        }
-        // Store student info for the page to use
-        window._eicStudent = data.student;
-      } catch (e) {
-        // Backend unreachable — redirect to login
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/eic-logo.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EIC Game Hub — IIIT Una</title>
+  <meta name="description"
+    content="EIC IIIT Una Game Hub - Interactive stock market ecosystem and entrepreneurial games." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<!-- ── AUTH GUARD (runs before page renders) ── -->
+<script>
+  (async () => {
+    const API_BASE = 'http://localhost:5000';
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/me`, {
+        credentials: 'include'
+      });
+      const data = await res.json();
+      if (!data.authenticated) {
         window.location.replace('login.html');
+        return;
+      }
+      if (data.mustChangePassword) {
+        window.location.replace('change-password.html');
+        return;
+      }
+      // Store student info for the page to use
+      window._eicStudent = data.student;
+    } catch (e) {
+      // Backend unreachable — redirect to login
+      window.location.replace('login.html');
+    }
+  })();
+</script>
+
+<body class="games-page">
+
+  <!-- ── FLOATING NAVBAR ── -->
+  <header class="navbar games-navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <img src="/eic-logo.png" alt="EIC IIIT Una Logo" class="nav-logo" />
+        <div class="nav-brand-text">
+          <span class="brand-title">EIC</span>
+          <span class="brand-sub">GAME HUB</span>
+        </div>
+      </a>
+
+      <div class="status-pill nav-status">
+        <span class="status-dot"></span>
+        <span class="status-text">GAME HUB ACTIVE</span>
+      </div>
+
+      <div class="nav-right-group">
+        <span class="nav-student-name" id="nav-student-name"></span>
+        <a href="index.html" class="btn btn-secondary back-eic-btn">
+          <span>← BACK</span>
+        </a>
+        <button class="logout-btn" id="logout-btn" title="Logout">
+          <span>⏻ LOGOUT</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── GAME HUB ARENAS ── -->
+  <main class="games-main">
+    <section class="games-hub-section" id="game-hub-section">
+      <div class="section-container">
+        <div class="section-header center">
+          <span class="section-tag">[ EIC ARCADE // ARENAS ]</span>
+          <h2 class="section-title">EIC GAME HUB</h2>
+          <p class="section-subtitle">Select an interactive simulation arena to test your financial & startup skills.
+          </p>
+        </div>
+
+        <div class="games-arena-grid">
+
+          <!-- ARENA 1: MARKET MAYHEM (FLAGSHIP MULTIPLAYER GAME) -->
+          <div class="arena-card active"
+            style="border-color: var(--cyan); box-shadow: 0 0 25px rgba(0, 229, 255, 0.2);">
+            <div class="arena-badge ready">[ MULTIPLAYER LIVE ]</div>
+            <div class="arena-icon">📊</div>
+            <h3 class="arena-title">MARKET MAYHEM</h3>
+            <p class="arena-desc">
+              High-stakes 5-round multiplayer stock trading simulation. Form teams, buy private insider tips, manage
+              portfolios, and dominate the live leaderboard.
+            </p>
+            <div class="arena-tags">
+              <span>MULTIPLAYER</span>
+              <span>REAL-TIME</span>
+              <span>INSIDER TIPS</span>
+              <span>LEADERBOARD</span>
+            </div>
+            <a href="market-mayhem.html" class="btn btn-primary arena-btn">
+              <span>PLAY MARKET MAYHEM</span>
+              <span>→</span>
+            </a>
+          </div>
+
+          <!-- ARENA 2: STOCK TRADER -->
+          <div class="arena-card active">
+            <div class="arena-badge ready">[ SIMULATION READY ]</div>
+            <div class="arena-icon">📈</div>
+            <h3 class="arena-title">EIC STOCK TRADER</h3>
+            <p class="arena-desc">
+              Simulated equity trading platform for IIIT Una students to invest virtual portfolio capital in student
+              ventures and top stocks.
+            </p>
+            <div class="arena-tags">
+              <span>SIMULATION</span>
+              <span>REAL-TIME</span>
+              <span>PORTFOLIO</span>
+            </div>
+            <button class="btn btn-primary arena-btn"
+              onclick="alert('EIC Stock Trader simulation launching in next update!')">
+              <span>ENTER STOCK TRADER</span>
+              <span>→</span>
+            </button>
+          </div>
+
+          <!-- ARENA 3: BECH KE DIKHAO -->
+          <div class="arena-card">
+            <div class="arena-badge upcoming">[ ARENA LOCKED ]</div>
+            <div class="arena-icon">🎯</div>
+            <h3 class="arena-title">BECH KE DIKHAO</h3>
+            <p class="arena-desc">
+              High-stakes live sales & elevator pitch arena where founders test product market viability under market
+              pressure.
+            </p>
+            <div class="arena-tags">
+              <span>PITCHING</span>
+              <span>VALUATION</span>
+              <span>SALES</span>
+            </div>
+            <button class="btn btn-secondary arena-btn disabled" disabled>
+              <span>OPENING SOON</span>
+            </button>
+          </div>
+
+          <!-- ARENA 4: STARTUP INCUBATOR -->
+          <div class="arena-card">
+            <div class="arena-badge dev">[ IN DEVELOPMENT ]</div>
+            <div class="arena-icon">🚀</div>
+            <h3 class="arena-title">STARTUP INCUBATOR</h3>
+            <p class="arena-desc">
+              Multi-week incubator simulator taking student ventures from initial ideation to Series A seed funding.
+            </p>
+            <div class="arena-tags">
+              <span>STRATEGY</span>
+              <span>FUNDING</span>
+              <span>CAP TABLE</span>
+            </div>
+            <button class="btn btn-secondary arena-btn disabled" disabled>
+              <span>IN DEVELOPMENT</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // ── Post-load auth UI setup ──
+    (function () {
+      const API_BASE = 'http://localhost:5000';
+
+      // Show student name in navbar once loaded
+      if (window._eicStudent) {
+        const nameEl = document.getElementById('nav-student-name');
+        if (nameEl) nameEl.textContent = window._eicStudent.name;
+      }
+
+      // Logout
+      const logoutBtn = document.getElementById('logout-btn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+          logoutBtn.disabled = true;
+          logoutBtn.textContent = 'LOGGING OUT...';
+          try {
+            await fetch(`${API_BASE}/api/auth/logout`, {
+              method: 'POST',
+              credentials: 'include'
+            });
+          } catch (e) { /* ignore */ }
+          window.location.replace('login.html');
+        });
       }
     })();
   </script>
-  <body class="games-page">
+</body>
 
-    <!-- ── FLOATING NAVBAR ── -->
-    <header class="navbar games-navbar">
-      <div class="nav-container">
-        <a href="index.html" class="nav-brand">
-          <img src="/eic-logo.png" alt="EIC IIIT Una Logo" class="nav-logo" />
-          <div class="nav-brand-text">
-            <span class="brand-title">EIC</span>
-            <span class="brand-sub">GAME HUB</span>
-          </div>
-        </a>
-
-        <div class="status-pill nav-status">
-          <span class="status-dot"></span>
-          <span class="status-text">GAME HUB ACTIVE</span>
-        </div>
-
-        <div class="nav-right-group">
-          <span class="nav-student-name" id="nav-student-name"></span>
-          <a href="index.html" class="btn btn-secondary back-eic-btn">
-            <span>← BACK</span>
-          </a>
-          <button class="logout-btn" id="logout-btn" title="Logout">
-            <span>⏻ LOGOUT</span>
-          </button>
-        </div>
-      </div>
-    </header>
-
-    <!-- ── GAME HUB ARENAS ── -->
-    <main class="games-main">
-      <section class="games-hub-section" id="game-hub-section">
-        <div class="section-container">
-          <div class="section-header center">
-            <span class="section-tag">[ EIC ARCADE // ARENAS ]</span>
-            <h2 class="section-title">EIC GAME HUB</h2>
-            <p class="section-subtitle">Select an interactive simulation arena to test your financial & startup skills.</p>
-          </div>
-
-          <div class="games-arena-grid">
-            
-            <!-- ARENA 1: MARKET MAYHEM (FLAGSHIP MULTIPLAYER GAME) -->
-            <div class="arena-card active" style="border-color: var(--cyan); box-shadow: 0 0 25px rgba(0, 229, 255, 0.2);">
-              <div class="arena-badge ready">[ MULTIPLAYER LIVE ]</div>
-              <div class="arena-icon">📊</div>
-              <h3 class="arena-title">MARKET MAYHEM</h3>
-              <p class="arena-desc">
-                High-stakes 5-round multiplayer stock trading simulation. Form teams, buy private insider tips, manage portfolios, and dominate the live leaderboard.
-              </p>
-              <div class="arena-tags">
-                <span>MULTIPLAYER</span>
-                <span>REAL-TIME</span>
-                <span>INSIDER TIPS</span>
-                <span>LEADERBOARD</span>
-              </div>
-              <a href="market-mayhem.html" class="btn btn-primary arena-btn">
-                <span>PLAY MARKET MAYHEM</span>
-                <span>→</span>
-              </a>
-            </div>
-
-            <!-- ARENA 2: STOCK TRADER -->
-            <div class="arena-card active">
-              <div class="arena-badge ready">[ SIMULATION READY ]</div>
-              <div class="arena-icon">📈</div>
-              <h3 class="arena-title">EIC STOCK TRADER</h3>
-              <p class="arena-desc">
-                Simulated equity trading platform for IIIT Una students to invest virtual portfolio capital in student ventures and top stocks.
-              </p>
-              <div class="arena-tags">
-                <span>SIMULATION</span>
-                <span>REAL-TIME</span>
-                <span>PORTFOLIO</span>
-              </div>
-              <button class="btn btn-primary arena-btn" onclick="alert('EIC Stock Trader simulation launching in next update!')">
-                <span>ENTER STOCK TRADER</span>
-                <span>→</span>
-              </button>
-            </div>
-
-            <!-- ARENA 3: BECH KE DIKHAO -->
-            <div class="arena-card">
-              <div class="arena-badge upcoming">[ ARENA LOCKED ]</div>
-              <div class="arena-icon">🎯</div>
-              <h3 class="arena-title">BECH KE DIKHAO</h3>
-              <p class="arena-desc">
-                High-stakes live sales & elevator pitch arena where founders test product market viability under market pressure.
-              </p>
-              <div class="arena-tags">
-                <span>PITCHING</span>
-                <span>VALUATION</span>
-                <span>SALES</span>
-              </div>
-              <button class="btn btn-secondary arena-btn disabled" disabled>
-                <span>OPENING SOON</span>
-              </button>
-            </div>
-
-            <!-- ARENA 4: STARTUP INCUBATOR -->
-            <div class="arena-card">
-              <div class="arena-badge dev">[ IN DEVELOPMENT ]</div>
-              <div class="arena-icon">🚀</div>
-              <h3 class="arena-title">STARTUP INCUBATOR</h3>
-              <p class="arena-desc">
-                Multi-week incubator simulator taking student ventures from initial ideation to Series A seed funding.
-              </p>
-              <div class="arena-tags">
-                <span>STRATEGY</span>
-                <span>FUNDING</span>
-                <span>CAP TABLE</span>
-              </div>
-              <button class="btn btn-secondary arena-btn disabled" disabled>
-                <span>IN DEVELOPMENT</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <script>
-      // ── Post-load auth UI setup ──
-      (function () {
-        const API_BASE = 'http://localhost:5000';
-
-        // Show student name in navbar once loaded
-        if (window._eicStudent) {
-          const nameEl = document.getElementById('nav-student-name');
-          if (nameEl) nameEl.textContent = window._eicStudent.name;
-        }
-
-        // Logout
-        const logoutBtn = document.getElementById('logout-btn');
-        if (logoutBtn) {
-          logoutBtn.addEventListener('click', async () => {
-            logoutBtn.disabled = true;
-            logoutBtn.textContent = 'LOGGING OUT...';
-            try {
-              await fetch(`${API_BASE}/api/auth/logout`, {
-                method: 'POST',
-                credentials: 'include'
-              });
-            } catch (e) { /* ignore */ }
-            window.location.replace('login.html');
-          });
-        }
-      })();
-    </script>
-  </body>
 </html>

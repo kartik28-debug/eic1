@@ -22,10 +22,30 @@ function setupMarketMayhem(app, io, pool) {
 
   // ─── Helper Functions ───
 
-  // Get or initialize active game
+  // Get the current active (non-ENDED) game — used for live game actions
   async function getActiveGame() {
     const res = await pool.query("SELECT * FROM games WHERE status NOT IN ('ENDED') ORDER BY id DESC LIMIT 1;");
     return res.rows[0] || null;
+  }
+
+  // Get a specific game by ID — used for results, history, ended games
+  async function getGameById(gameId) {
+    const res = await pool.query('SELECT * FROM games WHERE id = $1;', [gameId]);
+    return res.rows[0] || null;
+  }
+
+  // Get the most recently ended game — used for debrief/results when no active game
+  async function getLatestEndedGame() {
+    const res = await pool.query("SELECT * FROM games WHERE status = 'ENDED' ORDER BY ended_at DESC LIMIT 1;");
+    return res.rows[0] || null;
+  }
+
+  // Stop and clear the round timer for a game
+  function stopRoundTimer(gameId) {
+    if (activeTimers[gameId] && activeTimers[gameId].intervalId) {
+      clearInterval(activeTimers[gameId].intervalId);
+      delete activeTimers[gameId];
+    }
   }
 
   // Get prices for a specific round (falls back to round 0 if current round price not yet revealed)
@@ -177,6 +197,152 @@ function setupMarketMayhem(app, io, pool) {
     }
   });
 
+  // 1b. GET /api/market-mayhem/games/history — list all games (host only reference)
+  app.get('/api/market-mayhem/games/history', async (req, res) => {
+    try {
+      const result = await pool.query('SELECT id, name, status, current_round, current_phase, created_at, started_at, ended_at FROM games ORDER BY id DESC;');
+      return res.json({ success: true, games: result.rows });
+    } catch (err) {
+      console.error('Error fetching game history:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // ─── Internal: Seed a new game with default stocks, events, and tips ───
+  async function seedNewGame(client, gameId) {
+    const stocksData = [
+      { name: 'Nexora Bank', ticker: 'NXB', sector: 'Banking', description: 'Digital-first banking platform serving tech startups, MSMEs, and young professionals across India.', volatility: 'Medium', initialPrice: 1200.00, historical: [1050.00, 1100.00, 1140.00, 1120.00, 1180.00, 1200.00] },
+      { name: 'ByteForge Systems', ticker: 'BFS', sector: 'IT', description: 'Enterprise cloud infrastructure provider and AI-driven workflow optimization software developer.', volatility: 'High', initialPrice: 850.00, historical: [720.00, 780.00, 810.00, 790.00, 830.00, 850.00] },
+      { name: 'Helixora Pharma', ticker: 'HXP', sector: 'Pharma', description: 'Specialty biopharmaceutical company manufacturing generic vaccines and targeted oncology treatments.', volatility: 'Medium', initialPrice: 540.00, historical: [490.00, 510.00, 500.00, 530.00, 525.00, 540.00] },
+      { name: 'Voltaris Energy', ticker: 'VTE', sector: 'Energy', description: 'Next-generation renewable energy enterprise building solar micro-grids and industrial battery storage.', volatility: 'High', initialPrice: 1650.00, historical: [1400.00, 1480.00, 1550.00, 1510.00, 1600.00, 1650.00] },
+      { name: 'MotoraX Mobility', ticker: 'MAX', sector: 'Auto', description: 'Commercial EV vehicle manufacturer pioneering electric urban transit buses and fleet delivery vans.', volatility: 'Low', initialPrice: 320.00, historical: [300.00, 305.00, 310.00, 312.00, 318.00, 320.00] }
+    ];
+
+    const stockMap = {};
+    for (const s of stocksData) {
+      const r = await client.query(
+        'INSERT INTO stocks (game_id, name, ticker, sector, description, volatility) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id;',
+        [gameId, s.name, s.ticker, s.sector, s.description, s.volatility]
+      );
+      const stockId = r.rows[0].id;
+      stockMap[s.ticker] = stockId;
+      await client.query('INSERT INTO stock_prices (game_id, stock_id, round_number, price) VALUES ($1,$2,0,$3);', [gameId, stockId, s.initialPrice]);
+      for (let idx = 0; idx < s.historical.length; idx++) {
+        await client.query('INSERT INTO stock_prices (game_id, stock_id, round_number, price) VALUES ($1,$2,$3,$4);', [gameId, stockId, -6 + idx, s.historical[idx]]);
+      }
+    }
+
+    const roundEventsData = [
+      { round: 1, ticker: 'NXB', block_deal_text: 'Domestic institutional investor acquires 2,50,000 equity shares of Nexora Bank.', news_text: 'Nexora Bank records 24% YoY surge in digital transaction volume and net interest margin growth.', true_price_change: 12.0, noise: 1.5 },
+      { round: 1, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems secures multi-year cloud management contract with a global logistics hub.', true_price_change: 5.0, noise: 0.8 },
+      { round: 1, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma announces successful Phase 1 safety trials for new oncology formulation.', true_price_change: 2.0, noise: 0.5 },
+      { round: 1, ticker: 'VTE', block_deal_text: null, news_text: 'Global crude price drop temporarily dampens renewable energy market sentiment.', true_price_change: -4.0, noise: 1.0 },
+      { round: 1, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility delivers 100 electric buses to state transport corporation.', true_price_change: 1.0, noise: 0.2 },
+      { round: 2, ticker: 'BFS', block_deal_text: null, news_text: 'Global microchip shortage causes 3-week delay in ByteForge enterprise server deployments.', true_price_change: -15.0, noise: -1.2 },
+      { round: 2, ticker: 'VTE', block_deal_text: 'Surprise block trade executed in Voltaris Energy by green energy venture capital firm.', news_text: 'Voltaris Energy unveils groundbreaking 50MW battery storage facility.', true_price_change: 18.0, noise: 2.0 },
+      { round: 2, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma reports steady Q2 generic drug sales in overseas export markets.', true_price_change: 6.0, noise: -0.5 },
+      { round: 2, ticker: 'NXB', block_deal_text: null, news_text: 'Nexora Bank increases deposit rates by 25 bps to attract retail fixed deposits.', true_price_change: -3.0, noise: 0.4 },
+      { round: 2, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility maintains stable electric vehicle production targets.', true_price_change: 0.0, noise: 0.1 },
+      { round: 3, ticker: 'HXP', block_deal_text: 'Bulk purchase of 5,00,000 shares of Helixora Pharma by international healthcare fund.', news_text: 'Helixora Pharma receives WHO fast-track authorization for mass vaccine deployment.', true_price_change: 22.0, noise: 1.0 },
+      { round: 3, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems resolves chip supply bottlenecks and resumes normal software integration.', true_price_change: 10.0, noise: 0.6 },
+      { round: 3, ticker: 'NXB', block_deal_text: null, news_text: 'Nexora Bank launches instant AI micro-loan app for small businesses.', true_price_change: 4.0, noise: -0.2 },
+      { round: 3, ticker: 'VTE', block_deal_text: null, news_text: 'Voltaris Energy faces short-term profit booking after recent price rally.', true_price_change: -8.0, noise: -1.0 },
+      { round: 3, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility expands EV charging network across 12 smart cities.', true_price_change: 3.0, noise: 0.3 },
+      { round: 4, ticker: 'VTE', block_deal_text: null, news_text: 'Voltaris Energy wins ₹4,500 Crore mega solar grid EPC contract from central power grid.', true_price_change: 24.0, noise: 1.0 },
+      { round: 4, ticker: 'MAX', block_deal_text: 'Promoter group sells 4% stake in MotoraX Mobility via open market block deal.', news_text: 'MotoraX Mobility battery supplier reports temporary factory shutdown due to flooding.', true_price_change: -12.0, noise: -0.8 },
+      { round: 4, ticker: 'NXB', block_deal_text: null, news_text: 'Nexora Bank provisions additional reserves for unsecured credit card defaults.', true_price_change: -5.0, noise: 0.5 },
+      { round: 4, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems trades flat amid mixed analyst ratings.', true_price_change: -2.0, noise: 0.2 },
+      { round: 4, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma consolidates gains after previous vaccine approval spike.', true_price_change: -4.0, noise: -0.4 },
+      { round: 5, ticker: 'NXB', block_deal_text: 'Final round strategic equity investment in Nexora Bank by global fintech group.', news_text: 'Central Bank cuts repo rate by 50 bps; banking stock valuations skyrocket.', true_price_change: 18.0, noise: 1.2 },
+      { round: 5, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems announces breakthrough Generative AI enterprise suite with high pre-orders.', true_price_change: 20.0, noise: 1.5 },
+      { round: 5, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility announces maiden dividend and commercial EV export deal to Southeast Asia.', true_price_change: 12.0, noise: 0.6 },
+      { round: 5, ticker: 'VTE', block_deal_text: null, news_text: 'Voltaris Energy reports stellar annual earnings exceeding street estimates.', true_price_change: 10.0, noise: 0.8 },
+      { round: 5, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma posts solid quarterly revenue growth across all domestic formulations.', true_price_change: 8.0, noise: 0.4 }
+    ];
+    for (const ev of roundEventsData) {
+      await client.query(
+        'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+        [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+      );
+    }
+
+    const tipsData = [
+      { round: 1, ticker: 'NXB', source: 'Market Clerk', price: 3000, isSuper: false, isTrue: true, effect: 12.0, isFlagged: false, text: 'Unusual cash and digital deposit inflows observed at Nexora Bank urban branches this week.' },
+      { round: 1, ticker: 'BFS', source: 'Junior Analyst', price: 4000, isSuper: false, isTrue: true, effect: 5.0, isFlagged: false, text: 'ByteForge Systems expected to comfortably meet Q1 cloud licensing targets.' },
+      { round: 1, ticker: 'VTE', source: 'Industry Insider', price: 5500, isSuper: false, isTrue: false, effect: -4.0, isFlagged: false, text: 'Rumor: Voltaris Energy facing severe lithium cell procurement bottlenecks this quarter.' },
+      { round: 2, ticker: 'BFS', source: 'Research Assistant', price: 6000, isSuper: false, isTrue: true, effect: -15.0, isFlagged: true, text: 'Leaked memo indicates microchip delivery failure halting ByteForge enterprise server production lines.' },
+      { round: 2, ticker: 'VTE', source: 'Supplier', price: 7500, isSuper: false, isTrue: true, effect: 18.0, isFlagged: false, text: 'Voltaris battery deliveries to industrial grid projects up 40% over scheduled estimates.' },
+      { round: 2, ticker: 'HXP', source: 'Board Member', price: 8000, isSuper: false, isTrue: false, effect: 6.0, isFlagged: false, text: 'Internal memo claims Helixora clinical trials hit unexpected regulatory delays.' },
+      { round: 3, ticker: 'HXP', source: 'Industry Insider', price: 12000, isSuper: true, isTrue: true, effect: 22.0, isFlagged: true, text: 'SUPER TIP: World Health Organization approval letter for Helixora vaccine fast-track signed yesterday!' },
+      { round: 3, ticker: 'NXB', source: 'Market Clerk', price: 3500, isSuper: false, isTrue: true, effect: 4.0, isFlagged: false, text: 'Steady loan disbursement numbers noted across Nexora Bank SME business centers.' },
+      { round: 4, ticker: 'VTE', source: 'Research Assistant', price: 9000, isSuper: false, isTrue: true, effect: 24.0, isFlagged: true, text: 'Voltaris Energy selected as L1 highest bidder for government solar microgrid scheme.' },
+      { round: 4, ticker: 'MAX', source: 'Junior Analyst', price: 4500, isSuper: false, isTrue: true, effect: -12.0, isFlagged: false, text: 'MotoraX bus delivery schedule disrupted following flood damage at key battery assembly unit.' },
+      { round: 5, ticker: 'NXB', source: 'Board Member', price: 15000, isSuper: true, isTrue: true, effect: 18.0, isFlagged: false, text: 'SUPER TIP: Central Bank preparing emergency 50 bps interest rate cut to boost credit growth!' },
+      { round: 5, ticker: 'BFS', source: 'Supplier', price: 5000, isSuper: false, isTrue: false, effect: 20.0, isFlagged: false, text: 'ByteForge enterprise client renewals reported declining sharply in Q4.' }
+    ];
+    for (const t of tipsData) {
+      await client.query(
+        'INSERT INTO tips (game_id, round_number, stock_id, text, source_label, price, is_super_tip, is_true, effect_size, is_flagged) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);',
+        [gameId, t.round, stockMap[t.ticker], t.text, t.source, t.price, t.isSuper, t.isTrue, t.effect, t.isFlagged]
+      );
+    }
+  }
+
+  // 1c. POST /api/market-mayhem/games — Create a brand-new game (host only)
+  app.post('/api/market-mayhem/games', requireHost, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const { gameName, startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound } = req.body;
+
+      const name = (gameName && gameName.trim()) || 'Market Mayhem';
+      const cash = parseFloat(startingCash) || 100000.00;
+      const teamSize = parseInt(maxTeamSize) || 4;
+      const timer = parseInt(roundTimerSeconds) || 120;
+      const penalty = parseFloat(penaltyPercentage) || 10.00;
+      const sebi = parseInt(sebiCheckRound) || 4;
+
+      await client.query('BEGIN');
+
+      // Insert new game row
+      const gameRes = await client.query(`
+        INSERT INTO games (name, status, starting_cash, max_team_size, round_timer_seconds, penalty_percentage, sebi_check_round, current_round, current_phase, allow_solo)
+        VALUES ($1, 'LOBBY', $2, $3, $4, $5, $6, 1, 'LOBBY', TRUE)
+        RETURNING *;
+      `, [name, cash, teamSize, timer, penalty, sebi]);
+
+      const newGame = gameRes.rows[0];
+
+      // Seed stocks, events, and tips for the new game
+      await seedNewGame(client, newGame.id);
+
+      await client.query('COMMIT');
+
+      console.log(`🎮 New game created: ID ${newGame.id} — ${newGame.name}`);
+
+      return res.json({
+        success: true,
+        game: {
+          id: newGame.id,
+          name: newGame.name,
+          status: newGame.status,
+          current_round: newGame.current_round,
+          current_phase: newGame.current_phase,
+          starting_cash: newGame.starting_cash,
+          max_team_size: newGame.max_team_size,
+          round_timer_seconds: newGame.round_timer_seconds,
+          allow_solo: newGame.allow_solo
+        }
+      });
+
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('Create game error:', err);
+      res.status(500).json({ success: false, message: `Failed to create game: ${err.message}` });
+    } finally {
+      client.release();
+    }
+  });
+
   // 2. GET /api/market-mayhem/fact-sheet
   app.get('/api/market-mayhem/fact-sheet', async (req, res) => {
     try {
@@ -213,13 +379,21 @@ function setupMarketMayhem(app, io, pool) {
   });
 
   // 3. GET /api/market-mayhem/my-team
+  // Returns team for the active game, or by ?gameId= for specific game (e.g., ended game)
   app.get('/api/market-mayhem/my-team', async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).json({ success: false, message: 'Not authenticated' });
       }
 
-      const game = await getActiveGame();
+      // Support ?gameId= for fetching team in a specific (e.g. ended) game
+      let game = null;
+      if (req.query.gameId) {
+        game = await getGameById(parseInt(req.query.gameId));
+      } else {
+        game = await getActiveGame();
+        if (!game) game = await getLatestEndedGame();
+      }
       if (!game) return res.json({ success: true, inTeam: false });
 
       const memberRes = await pool.query(`
@@ -274,6 +448,11 @@ function setupMarketMayhem(app, io, pool) {
 
       const game = await getActiveGame();
       if (!game) return res.status(400).json({ success: false, message: 'No active game available.' });
+
+      // Security: reject team creation for ENDED games
+      if (game.status === 'ENDED') {
+        return res.status(400).json({ success: false, message: 'Game has ended. Team creation disabled.' });
+      }
 
       if (game.status !== 'LOBBY') {
         return res.status(400).json({ success: false, message: 'Game has already started. Team creation disabled.' });
@@ -362,6 +541,11 @@ function setupMarketMayhem(app, io, pool) {
       const game = await getActiveGame();
       if (!game) return res.status(400).json({ success: false, message: 'No active game.' });
 
+      // Security: reject joining for ENDED games
+      if (game.status === 'ENDED') {
+        return res.status(400).json({ success: false, message: 'Game has ended. Joining disabled.' });
+      }
+
       if (game.status !== 'LOBBY') {
         return res.status(400).json({ success: false, message: 'Game has already started. Joining disabled.' });
       }
@@ -430,16 +614,19 @@ function setupMarketMayhem(app, io, pool) {
   });
 
   // 6. GET /api/market-mayhem/state
+  // When game is ENDED, falls back to latest ended game so players still see results on refresh
   app.get('/api/market-mayhem/state', async (req, res) => {
     try {
       if (!req.session.userId) {
         return res.status(401).json({ success: false, message: 'Not authenticated' });
       }
 
-      const game = await getActiveGame();
+      // Try active game first; fall back to latest ended game
+      let game = await getActiveGame();
+      if (!game) game = await getLatestEndedGame();
       if (!game) return res.status(404).json({ success: false, message: 'No active game' });
 
-      // Find user team
+      // Find user team (scoped to this game)
       const memberRes = await pool.query(`
         SELECT tm.team_id, t.team_name, t.team_code, t.cash_balance
         FROM team_members tm
@@ -462,13 +649,13 @@ function setupMarketMayhem(app, io, pool) {
           cashBalance: parseFloat(t.cash_balance)
         };
 
-        // Holdings
+        // Holdings (scoped to this game)
         const hRes = await pool.query(`
           SELECT h.stock_id, h.quantity, s.name, s.ticker
           FROM holdings h
           JOIN stocks s ON s.id = h.stock_id
-          WHERE h.team_id = $1 AND h.quantity > 0;
-        `, [team.id]);
+          WHERE h.team_id = $1 AND h.quantity > 0 AND h.game_id = $2;
+        `, [team.id, game.id]);
         holdings = hRes.rows;
 
         // Purchased Tips for team — HIDDEN FIELDS STRICTLY EXCLUDED!
@@ -477,26 +664,26 @@ function setupMarketMayhem(app, io, pool) {
           FROM team_tips tt
           JOIN tips t ON t.id = tt.tip_id
           JOIN stocks s ON s.id = t.stock_id
-          WHERE tt.team_id = $1
+          WHERE tt.team_id = $1 AND t.game_id = $2
           ORDER BY tt.purchased_at DESC;
-        `, [team.id]);
+        `, [team.id, game.id]);
         purchasedTips = tipsRes.rows;
 
-        // Recent trades
+        // Recent trades (scoped to this game)
         const tradesRes = await pool.query(`
           SELECT tr.id, tr.stock_id, s.ticker, s.name, tr.type, tr.quantity, tr.price, tr.total_value, tr.round_number, tr.created_at
           FROM trades tr
           JOIN stocks s ON s.id = tr.stock_id
-          WHERE tr.team_id = $1
+          WHERE tr.team_id = $1 AND tr.game_id = $2
           ORDER BY tr.created_at DESC LIMIT 20;
-        `, [team.id]);
+        `, [team.id, game.id]);
         trades = tradesRes.rows;
 
-        // Penalties
+        // Penalties (scoped to this game)
         const penRes = await pool.query(`
           SELECT id, round_number, reason, amount, created_at
-          FROM penalties WHERE team_id = $1 ORDER BY created_at DESC;
-        `, [team.id]);
+          FROM penalties WHERE team_id = $1 AND game_id = $2 ORDER BY created_at DESC;
+        `, [team.id, game.id]);
         penalties = penRes.rows;
       }
 
@@ -585,9 +772,10 @@ function setupMarketMayhem(app, io, pool) {
         return res.status(400).json({ success: false, message: 'No active game.' });
       }
 
+      // Security: reject trades if game is not ACTIVE (catches ENDED, LOBBY)
       if (game.status !== 'ACTIVE') {
         await client.query('ROLLBACK');
-        return res.status(400).json({ success: false, message: 'Game is not active.' });
+        return res.status(400).json({ success: false, message: 'Game is not active. Trading is disabled.' });
       }
 
       if (game.current_phase !== 'TRADING') {
@@ -650,10 +838,10 @@ function setupMarketMayhem(app, io, pool) {
         `, [game.id, teamId, stockId, qty]);
 
       } else if (tradeType === 'SELL') {
-        // Check current holding
+        // Check current holding (scoped to this game)
         const holdingRes = await client.query(`
-          SELECT quantity FROM holdings WHERE team_id = $1 AND stock_id = $2 FOR UPDATE;
-        `, [teamId, stockId]);
+          SELECT quantity FROM holdings WHERE team_id = $1 AND stock_id = $2 AND game_id = $3 FOR UPDATE;
+        `, [teamId, stockId, game.id]);
 
         const ownedQty = holdingRes.rows.length > 0 ? holdingRes.rows[0].quantity : 0;
         if (ownedQty < qty) {
@@ -668,10 +856,10 @@ function setupMarketMayhem(app, io, pool) {
         cashBalance += totalCost;
         await client.query('UPDATE teams SET cash_balance = $1 WHERE id = $2;', [cashBalance, teamId]);
 
-        // Deduct holding
+        // Deduct holding (scoped to this game)
         await client.query(`
-          UPDATE holdings SET quantity = quantity - $1 WHERE team_id = $2 AND stock_id = $3;
-        `, [qty, teamId, stockId]);
+          UPDATE holdings SET quantity = quantity - $1 WHERE team_id = $2 AND stock_id = $3 AND game_id = $4;
+        `, [qty, teamId, stockId, game.id]);
       }
 
       // Insert trade record
@@ -744,6 +932,12 @@ function setupMarketMayhem(app, io, pool) {
       if (!game) {
         await client.query('ROLLBACK');
         return res.status(400).json({ success: false, message: 'No active game' });
+      }
+
+      // Security: reject tip purchases if game is not ACTIVE
+      if (game.status !== 'ACTIVE') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'Game is not active. Tip purchases are disabled.' });
       }
 
       if (game.current_phase !== 'TIP_SHOP' && game.current_phase !== 'TRADING') {
@@ -854,9 +1048,17 @@ function setupMarketMayhem(app, io, pool) {
   });
 
   // 9. GET /api/market-mayhem/debrief — Final Game Reveal Debrief
+  // Works for active game, ended game (via fallback), or specific game via ?gameId=
   app.get('/api/market-mayhem/debrief', async (req, res) => {
     try {
-      const game = await getActiveGame();
+      let game = null;
+      if (req.query.gameId) {
+        game = await getGameById(parseInt(req.query.gameId));
+      } else {
+        // Try active first, then fall back to most recently ended
+        game = await getActiveGame();
+        if (!game) game = await getLatestEndedGame();
+      }
       if (!game) return res.status(404).json({ success: false, message: 'No game found' });
 
       // Debrief data contains full tip information including hidden fields
@@ -871,7 +1073,7 @@ function setupMarketMayhem(app, io, pool) {
 
       const leaderboard = await getLeaderboard(game.id);
 
-      // Penalties history
+      // Penalties history (scoped to this game)
       const penaltiesRes = await pool.query(`
         SELECT p.id, p.team_id, tm.team_name, p.round_number, p.reason, p.amount
         FROM penalties p
@@ -879,7 +1081,7 @@ function setupMarketMayhem(app, io, pool) {
         WHERE p.game_id = $1 ORDER BY p.round_number ASC;
       `, [game.id]);
 
-      // Stock price history round by round
+      // Stock price history round by round (scoped to this game)
       const pricesRes = await pool.query(`
         SELECT sp.stock_id, s.ticker, s.name, sp.round_number, sp.price
         FROM stock_prices sp
@@ -890,6 +1092,8 @@ function setupMarketMayhem(app, io, pool) {
 
       return res.json({
         success: true,
+        gameId: game.id,
+        gameName: game.name,
         gameStatus: game.status,
         tips: tipsRes.rows,
         leaderboard,
@@ -959,12 +1163,13 @@ function setupMarketMayhem(app, io, pool) {
     try {
       const { newPhase, newRound } = req.body;
       const game = await getActiveGame();
-      if (!game) return res.status(404).json({ success: false, message: 'No game found' });
+      if (!game) return res.status(404).json({ success: false, message: 'No active game found' });
 
       let roundToSet = newRound || game.current_round;
       let phaseToSet = newPhase || game.current_phase;
       let statusToSet = game.status;
       let isStartingGame = false;
+      let isEndingGame = false;
 
       if (phaseToSet === 'START_GAME') {
         // Validate: need at least one team
@@ -976,10 +1181,17 @@ function setupMarketMayhem(app, io, pool) {
         phaseToSet = 'BLOCK_DEAL';
         roundToSet = 1;
         isStartingGame = true;
+      } else if (phaseToSet === 'END_GAME') {
+        // Host pressed END GAME — immediately end the game regardless of current round
+        statusToSet = 'ENDED';
+        phaseToSet = 'REVEAL';
+        roundToSet = game.current_round; // keep current round
+        isEndingGame = true;
       } else if (phaseToSet === 'NEXT_ROUND') {
         if (roundToSet >= 5) {
           statusToSet = 'ENDED';
           phaseToSet = 'REVEAL';
+          isEndingGame = true;
         } else {
           roundToSet += 1;
           phaseToSet = 'BLOCK_DEAL';
@@ -1007,6 +1219,11 @@ function setupMarketMayhem(app, io, pool) {
           `UPDATE games SET status = $1, current_phase = $2, current_round = $3 WHERE id = $4;`,
           [statusToSet, phaseToSet, roundToSet, game.id]
         );
+      }
+
+      // If game is ending, stop the timer immediately
+      if (isEndingGame) {
+        stopRoundTimer(game.id);
       }
 
       // If phase changes to REVEAL, execute price engine
@@ -1038,6 +1255,20 @@ function setupMarketMayhem(app, io, pool) {
         console.log(`🚀 Game ${game.id} STARTED — emitting game-started to room game_${game.id}`);
       }
 
+      // If game just ended, emit dedicated game-ended event with final leaderboard
+      if (isEndingGame) {
+        const finalLeaderboard = await getLeaderboard(game.id);
+        io.to(`game_${game.id}`).emit('game-ended', {
+          gameId: game.id,
+          status: 'ENDED',
+          currentPhase: phaseToSet,
+          currentRound: roundToSet,
+          leaderboard: finalLeaderboard,
+          message: 'The game has ended. Final results are now available.'
+        });
+        console.log(`🏁 Game ${game.id} ENDED — emitting game-ended to room game_${game.id}`);
+      }
+
       await broadcastGameState(game.id);
 
       return res.json({
@@ -1051,6 +1282,74 @@ function setupMarketMayhem(app, io, pool) {
     } catch (err) {
       console.error('Phase change error:', err);
       res.status(500).json({ success: false, message: `Failed to change phase: ${err.message}` });
+    }
+  });
+
+  // POST /api/market-mayhem/host/new-game — Create a fresh game after the current one ends
+  // Validates previous game is ENDED before creating a new one with a new ID
+  app.post('/api/market-mayhem/host/new-game', requireHost, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const { gameName, startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound } = req.body;
+
+      // Verify no currently active game exists
+      const currentActive = await getActiveGame();
+      if (currentActive) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot create new game: Game "${currentActive.name}" (ID #${currentActive.id}) is still active. End it first.`
+        });
+      }
+
+      const name = (gameName && gameName.trim()) || 'Market Mayhem';
+      const cash = parseFloat(startingCash) || 100000.00;
+      const teamSize = parseInt(maxTeamSize) || 4;
+      const timer = parseInt(roundTimerSeconds) || 120;
+      const penalty = parseFloat(penaltyPercentage) || 10.00;
+      const sebi = parseInt(sebiCheckRound) || 4;
+
+      await client.query('BEGIN');
+
+      // Create fresh game row with a new ID — does NOT touch old game
+      const gameRes = await client.query(`
+        INSERT INTO games (name, status, starting_cash, max_team_size, round_timer_seconds, penalty_percentage, sebi_check_round, current_round, current_phase, allow_solo)
+        VALUES ($1, 'LOBBY', $2, $3, $4, $5, $6, 1, 'LOBBY', TRUE)
+        RETURNING *;
+      `, [name, cash, teamSize, timer, penalty, sebi]);
+
+      const newGame = gameRes.rows[0];
+
+      // Seed fresh stocks, round events, and tips for the new game
+      await seedNewGame(client, newGame.id);
+
+      await client.query('COMMIT');
+
+      console.log(`🎮 New game created via host/new-game: ID ${newGame.id} — ${newGame.name}`);
+
+      return res.json({
+        success: true,
+        message: `New game "${newGame.name}" created successfully.`,
+        game: {
+          id: newGame.id,
+          name: newGame.name,
+          status: newGame.status,
+          current_round: newGame.current_round,
+          current_phase: newGame.current_phase,
+          starting_cash: newGame.starting_cash,
+          max_team_size: newGame.max_team_size,
+          round_timer_seconds: newGame.round_timer_seconds,
+          penalty_percentage: newGame.penalty_percentage,
+          sebi_check_round: newGame.sebi_check_round,
+          allow_solo: newGame.allow_solo
+        }
+      });
+
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('New game creation error:', err);
+      res.status(500).json({ success: false, message: `Failed to create new game: ${err.message}` });
+    } finally {
+      client.release();
     }
   });
 
@@ -1075,20 +1374,27 @@ function setupMarketMayhem(app, io, pool) {
 
       const newPrice = Math.max(1.0, Math.round((prevPrice * (1 + pctChange / 100)) * 100) / 100);
 
-      // Insert new price for this round
-      await pool.query(`
-        INSERT INTO stock_prices (game_id, stock_id, round_number, price)
-        VALUES ($1, $2, $3, $4);
-      `, [gameId, stockId, roundNumber, newPrice]);
+      // Insert new price for this round (guard against duplicates on repeated REVEAL)
+      const existing = await pool.query('SELECT id FROM stock_prices WHERE game_id = $1 AND stock_id = $2 AND round_number = $3;', [gameId, stockId, roundNumber]);
+      if (existing.rows.length === 0) {
+        await pool.query(`
+          INSERT INTO stock_prices (game_id, stock_id, round_number, price)
+          VALUES ($1, $2, $3, $4);
+        `, [gameId, stockId, roundNumber, newPrice]);
+      }
     }
 
     // Record team value history at end of round
     const leaderboard = await getLeaderboard(gameId);
     for (const team of leaderboard) {
-      await pool.query(`
-        INSERT INTO team_value_history (game_id, team_id, round_number, cash_value, holdings_value, total_value)
-        VALUES ($1, $2, $3, $4, $5, $6);
-      `, [gameId, team.teamId, roundNumber, team.cashBalance, team.holdingsValue, team.totalValue]);
+      // Avoid duplicate history records
+      const existingHistory = await pool.query('SELECT id FROM team_value_history WHERE game_id = $1 AND team_id = $2 AND round_number = $3;', [gameId, team.teamId, roundNumber]);
+      if (existingHistory.rows.length === 0) {
+        await pool.query(`
+          INSERT INTO team_value_history (game_id, team_id, round_number, cash_value, holdings_value, total_value)
+          VALUES ($1, $2, $3, $4, $5, $6);
+        `, [gameId, team.teamId, roundNumber, team.cashBalance, team.holdingsValue, team.totalValue]);
+      }
     }
   }
 
@@ -1163,7 +1469,12 @@ function setupMarketMayhem(app, io, pool) {
     try {
       const { eventType } = req.body; // 'CRASH' or 'BULL_RUN'
       const game = await getActiveGame();
-      if (!game) return res.status(404).json({ success: false, message: 'No game found' });
+      if (!game) return res.status(404).json({ success: false, message: 'No active game found' });
+
+      // Security: reject market events if game is ENDED
+      if (game.status === 'ENDED') {
+        return res.status(400).json({ success: false, message: 'Game has ended. Market events disabled.' });
+      }
 
       const stocksRes = await pool.query('SELECT id FROM stocks WHERE game_id = $1;', [game.id]);
 
@@ -1227,7 +1538,12 @@ function setupMarketMayhem(app, io, pool) {
   app.post('/api/market-mayhem/host/sebi-check', requireHost, async (req, res) => {
     try {
       const game = await getActiveGame();
-      if (!game) return res.status(404).json({ success: false, message: 'No game found' });
+      if (!game) return res.status(404).json({ success: false, message: 'No active game found' });
+
+      // Security: reject SEBI check if game is ENDED
+      if (game.status === 'ENDED') {
+        return res.status(400).json({ success: false, message: 'Game has ended. SEBI check disabled.' });
+      }
 
       const penaltyPct = parseFloat(game.penalty_percentage) / 100;
       const penaltiesApplied = [];
@@ -1244,14 +1560,14 @@ function setupMarketMayhem(app, io, pool) {
         const teamId = fp.team_id;
         const stockId = fp.stock_id;
 
-        // Check if team traded that stock
+        // Check if team traded that stock (scoped to this game)
         const tradeCheck = await pool.query(`
-          SELECT id FROM trades WHERE team_id = $1 AND stock_id = $2;
-        `, [teamId, stockId]);
+          SELECT id FROM trades WHERE team_id = $1 AND stock_id = $2 AND game_id = $3;
+        `, [teamId, stockId, game.id]);
 
         if (tradeCheck.rows.length > 0) {
-          // Check if penalty already applied
-          const existingPen = await pool.query('SELECT id FROM penalties WHERE team_id = $1 AND round_number = $2;', [teamId, game.current_round]);
+          // Check if penalty already applied this round (scoped to this game)
+          const existingPen = await pool.query('SELECT id FROM penalties WHERE team_id = $1 AND round_number = $2 AND game_id = $3;', [teamId, game.current_round, game.id]);
           if (existingPen.rows.length === 0) {
             // Get team total value
             const leaderboard = await getLeaderboard(game.id);
@@ -1297,9 +1613,14 @@ function setupMarketMayhem(app, io, pool) {
   app.post('/api/market-mayhem/host/super-tip/assign', requireHost, async (req, res) => {
     try {
       const game = await getActiveGame();
-      if (!game) return res.status(404).json({ success: false, message: 'No game found' });
+      if (!game) return res.status(404).json({ success: false, message: 'No active game found' });
 
-      // Find super tip for current round
+      // Security: reject super tip assignment if game is ENDED
+      if (game.status === 'ENDED') {
+        return res.status(400).json({ success: false, message: 'Game has ended. Super tip assignment disabled.' });
+      }
+
+      // Find super tip for current round (scoped to this game)
       const tipRes = await pool.query('SELECT * FROM tips WHERE game_id = $1 AND round_number = $2 AND is_super_tip = TRUE LIMIT 1;', [game.id, game.current_round]);
       if (tipRes.rows.length === 0) {
         return res.status(404).json({ success: false, message: `No super tip found for Round ${game.current_round}` });

@@ -32,7 +32,7 @@ function setupHostEventListeners() {
   if (btnNextPhase) btnNextPhase.addEventListener('click', () => changePhase('NEXT_PHASE'));
   if (btnPauseTimer) btnPauseTimer.addEventListener('click', pauseTimer);
   if (btnResumeTimer) btnResumeTimer.addEventListener('click', resumeTimer);
-  if (btnEndGame) btnEndGame.addEventListener('click', () => changePhase('END_GAME'));
+  if (btnEndGame) btnEndGame.addEventListener('click', handleEndGame);
 
   // Special Actions
   const btnSuperTip = document.getElementById('host-btn-super-tip');
@@ -49,6 +49,12 @@ function setupHostEventListeners() {
   const saveCfgBtn = document.getElementById('btn-save-config');
   if (saveCfgBtn) {
     saveCfgBtn.addEventListener('click', saveConfiguration);
+  }
+
+  // Create New Game confirm button
+  const confirmNewGameBtn = document.getElementById('btn-confirm-new-game');
+  if (confirmNewGameBtn) {
+    confirmNewGameBtn.addEventListener('click', createNewGame);
   }
 }
 
@@ -122,6 +128,27 @@ function initHostSocket() {
     if (liveTradesList.length > 30) liveTradesList.pop();
     renderHostTrades(liveTradesList);
   });
+
+  // game-ended: server confirmed game is ENDED — show ended controls immediately
+  socket.on('game-ended', ({ gameId, leaderboard, message }) => {
+    console.log(`[HOST] game-ended received for game ${gameId}`);
+    if (hostActiveGame) hostActiveGame.status = 'ENDED';
+    // Update badge immediately without waiting for loadHostData round-trip
+    const phaseBadge = document.getElementById('host-phase-badge');
+    if (phaseBadge) phaseBadge.textContent = 'STATUS: ENDED (REVEAL)';
+    showEndedControls(true);
+    if (leaderboard && leaderboard.length > 0) {
+      renderHostTeams(leaderboard);
+    }
+    // Show a non-blocking notification
+    const banner = document.getElementById('host-event-banner');
+    if (banner) {
+      banner.textContent = `✅ GAME ENDED: ${message || 'Final results are now live for all players.'}` ;
+      banner.style.display = 'block';
+      setTimeout(() => { banner.style.display = 'none'; }, 8000);
+    }
+    loadHostData();
+  });
 }
 
 async function loadHostData() {
@@ -136,7 +163,16 @@ async function loadHostData() {
       if (socket && socket.connected) {
         socket.emit('join-game-room', { gameId: hostActiveGame.id });
       }
+    } else {
+      // No active game found (all games ENDED or none exist yet)
+      hostActiveGame = null;
+      const title = document.getElementById('host-game-title');
+      const phaseBadge = document.getElementById('host-phase-badge');
+      if (title) title.textContent = 'No Active Game';
+      if (phaseBadge) phaseBadge.textContent = 'STATUS: ENDED';
+      showEndedControls(true); // show CREATE NEW GAME panel
     }
+
 
     // Load debrief master data for host monitoring
     const debriefRes = await fetch(`${API_BASE}/api/market-mayhem/debrief`, { credentials: 'include' });
@@ -162,6 +198,10 @@ function updateHostHeader(game) {
   if (roundBadge) roundBadge.textContent = `ROUND ${game.current_round} / 5`;
   if (phaseBadge) phaseBadge.textContent = `STATUS: ${game.status} (${game.current_phase})`;
 
+  // Show/hide phase controls vs ENDED panel
+  const isEnded = (game.status === 'ENDED');
+  showEndedControls(isEnded ? game : null);
+
   // Update Config Inputs
   const cfgCash = document.getElementById('cfg-starting-cash');
   const cfgTeamSize = document.getElementById('cfg-team-size');
@@ -182,6 +222,44 @@ function updateHostHeader(game) {
 
   const pricesRound = document.getElementById('host-prices-round');
   if (pricesRound) pricesRound.textContent = game.current_round;
+}
+
+// Show phase controls OR ended panel based on game state
+// Pass a truthy value (game object or true) to show ENDED panel; falsy to show normal controls
+function showEndedControls(showEnded) {
+  const phaseControls = document.getElementById('host-phase-controls');
+  const endedControls = document.getElementById('host-ended-controls');
+  const actionBar = document.querySelector('.host-actions-bar');
+
+  if (showEnded) {
+    // Game is ENDED — show the "CREATE NEW GAME" panel, hide normal controls
+    if (phaseControls) phaseControls.style.display = 'none';
+    if (endedControls) endedControls.style.display = 'block';
+    if (actionBar) actionBar.style.opacity = '0.4';
+
+    // Auto-populate the new game name based on history count
+    autoPopulateNewGameName();
+  } else {
+    // Game is active/lobby — show normal phase controls
+    if (phaseControls) phaseControls.style.display = '';
+    if (endedControls) endedControls.style.display = 'none';
+    if (actionBar) actionBar.style.opacity = '';
+  }
+}
+
+// Suggest next game name (Season N+1)
+async function autoPopulateNewGameName() {
+  const nameInput = document.getElementById('new-game-name');
+  if (!nameInput || nameInput.value.trim()) return; // Don't override manual input
+
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/games/history`, { credentials: 'include' });
+    const data = await res.json();
+    if (data.success) {
+      const count = data.games.length;
+      nameInput.value = `Market Mayhem Season ${count + 1}`;
+    }
+  } catch (e) { /* silent fallback */ }
 }
 
 function updateHostTimerDisplay(remainingSeconds) {
@@ -207,9 +285,8 @@ async function changePhase(newPhase) {
       else if (currentP === 'TRADING') payload = { newPhase: 'TIP_SHOP', newRound: currentR };
       else if (currentP === 'TIP_SHOP') payload = { newPhase: 'REVEAL', newRound: currentR };
       else if (currentP === 'REVEAL') payload = { newPhase: 'NEXT_ROUND', newRound: currentR };
-    } else if (newPhase === 'END_GAME') {
-      payload = { newPhase: 'REVEAL', newRound: 5 };
     }
+    // END_GAME is handled by handleEndGame() directly — not via changePhase()
 
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/phase-change`, {
       method: 'POST',
@@ -229,6 +306,147 @@ async function changePhase(newPhase) {
     alert('Failed to execute phase change.');
   }
 }
+
+// Dedicated END GAME handler — sends END_GAME directly to backend
+async function handleEndGame() {
+  const confirmed = window.confirm(
+    '⚠️ END GAME\n\nThis will immediately end the game for ALL players and display the final results.\n\nAre you sure?'
+  );
+  if (!confirmed) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/phase-change`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-host-key': 'EIC_HOST_2026' },
+      credentials: 'include',
+      body: JSON.stringify({ newPhase: 'END_GAME' })
+    });
+    const data = await res.json();
+    if (!data.success) {
+      alert(data.message);
+      return;
+    }
+    // UI update will be handled by game-ended socket event
+  } catch (e) {
+    alert('Failed to end game. Please try again.');
+  }
+}
+
+// ─── New Game Creation ───
+
+window.openNewGameModal = function() {
+  const modal = document.getElementById('new-game-modal');
+  if (modal) modal.classList.remove('hidden');
+  // Hide history panel if open
+  const histPanel = document.getElementById('host-history-panel');
+  if (histPanel) histPanel.classList.add('hidden');
+  // Auto-fill name
+  autoPopulateNewGameName();
+};
+
+window.closeNewGameModal = function() {
+  const modal = document.getElementById('new-game-modal');
+  if (modal) modal.classList.add('hidden');
+};
+
+async function createNewGame() {
+  const gameName = (document.getElementById('new-game-name')?.value || '').trim();
+  const startingCash = parseFloat(document.getElementById('new-game-cash')?.value) || 100000;
+  const maxTeamSize = parseInt(document.getElementById('new-game-team-size')?.value) || 4;
+  const roundTimerSeconds = parseInt(document.getElementById('new-game-timer')?.value) || 120;
+  const penaltyPercentage = parseFloat(document.getElementById('new-game-penalty')?.value) || 10;
+  const sebiCheckRound = parseInt(document.getElementById('new-game-sebi')?.value) || 4;
+
+  if (!gameName) {
+    alert('Please enter a game name.');
+    return;
+  }
+
+  const confirmBtn = document.getElementById('btn-confirm-new-game');
+  if (confirmBtn) {
+    confirmBtn.textContent = 'CREATING...';
+    confirmBtn.disabled = true;
+  }
+
+  try {
+    // Use dedicated /host/new-game endpoint which validates the previous game is ENDED
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/new-game`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-host-key': 'EIC_HOST_2026' },
+      credentials: 'include',
+      body: JSON.stringify({ gameName, startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound })
+    });
+
+    const data = await res.json();
+    if (!data.success) {
+      alert(`Failed to create game: ${data.message}`);
+      return;
+    }
+
+    const newGame = data.game;
+    hostActiveGame = newGame;
+
+    // Close modal
+    window.closeNewGameModal();
+
+    // Switch socket to new game room
+    if (socket && socket.connected) {
+      socket.emit('join-game-room', { gameId: newGame.id });
+    }
+
+    // Clear live trades list (fresh game)
+    liveTradesList.length = 0;
+
+    // Reload full host data
+    await loadHostData();
+
+    alert(`✅ New game created: ${newGame.name} (ID #${newGame.id})\nStatus: LOBBY — players can now join!`);
+
+  } catch (e) {
+    console.error('Create new game error:', e);
+    alert('Failed to create new game. Please try again.');
+  } finally {
+    if (confirmBtn) {
+      confirmBtn.textContent = '✨ CREATE GAME';
+      confirmBtn.disabled = false;
+    }
+  }
+}
+
+window.loadGameHistory = async function() {
+  const panel = document.getElementById('host-history-panel');
+  const list = document.getElementById('host-history-list');
+  if (!panel || !list) return;
+
+  panel.classList.toggle('hidden');
+
+  if (!panel.classList.contains('hidden')) {
+    try {
+      const res = await fetch(`${API_BASE}/api/market-mayhem/games/history`, { credentials: 'include' });
+      const data = await res.json();
+
+      if (data.success && data.games.length > 0) {
+        list.innerHTML = data.games.map(g => `
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 0; border-bottom:1px solid rgba(0,229,255,0.1);">
+            <div>
+              <span style="font-family:'JetBrains Mono',monospace; color:var(--cyan); font-size:0.8rem;">#${g.id}</span>
+              <strong style="margin-left:0.75rem;">${g.name}</strong>
+            </div>
+            <div style="display:flex; gap:0.75rem; align-items:center;">
+              <span class="phase-badge" style="font-size:0.75rem;">${g.status}</span>
+              <span style="font-size:0.75rem; color:#8aa2b8;">R${g.current_round} · ${g.current_phase}</span>
+              ${g.ended_at ? `<span style="font-size:0.7rem; color:#8aa2b8;">Ended: ${new Date(g.ended_at).toLocaleString()}</span>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        list.innerHTML = '<p class="empty-state">No previous games found.</p>';
+      }
+    } catch (e) {
+      list.innerHTML = '<p class="empty-state">Failed to load game history.</p>';
+    }
+  }
+};
 
 async function pauseTimer() {
   try {

@@ -73,14 +73,72 @@
           </div>
 
           <!-- Phase Control Buttons -->
-          <div class="host-controls-group">
+          <div class="host-controls-group" id="host-phase-controls">
             <button class="btn btn-primary" id="host-btn-start">🚀 START GAME</button>
             <button class="btn btn-secondary" id="host-btn-next-phase">⏭ NEXT PHASE</button>
             <button class="btn btn-outline" id="host-btn-pause-timer">⏸ PAUSE TIMER</button>
             <button class="btn btn-outline" id="host-btn-resume-timer">▶ RESUME TIMER</button>
             <button class="btn btn-secondary danger-btn" id="host-btn-end-game">🏁 END GAME</button>
           </div>
+
+          <!-- GAME ENDED state panel -->
+          <div class="host-controls-group" id="host-ended-controls" style="display:none;">
+            <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
+              <span style="color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-size:1rem; letter-spacing:0.1em;">🏁 GAME ENDED</span>
+              <button class="btn btn-primary" id="host-btn-new-game" onclick="openNewGameModal()">➕ CREATE NEW GAME</button>
+              <button class="btn btn-outline" id="host-btn-view-history" onclick="loadGameHistory()">📜 VIEW GAME HISTORY</button>
+            </div>
+          </div>
         </div>
+
+      <!-- CREATE NEW GAME MODAL -->
+      <div id="new-game-modal" class="mm-modal-overlay hidden">
+        <div class="mm-modal-card" style="max-width:520px;">
+          <div class="mm-badge" style="margin-bottom:1rem;">[ CREATE NEW GAME ]</div>
+          <h3 style="margin-bottom:1.2rem;">New Market Mayhem Session</h3>
+
+          <div class="config-grid">
+            <div class="form-group">
+              <label>Game Name</label>
+              <input type="text" id="new-game-name" placeholder="e.g. Market Mayhem Season 2" />
+            </div>
+            <div class="form-group">
+              <label>Starting Cash (₹)</label>
+              <input type="number" id="new-game-cash" value="100000" />
+            </div>
+            <div class="form-group">
+              <label>Max Team Size</label>
+              <input type="number" id="new-game-team-size" value="4" />
+            </div>
+            <div class="form-group">
+              <label>Round Timer (seconds)</label>
+              <input type="number" id="new-game-timer" value="120" />
+            </div>
+            <div class="form-group">
+              <label>Penalty (%)</label>
+              <input type="number" id="new-game-penalty" value="10" />
+            </div>
+            <div class="form-group">
+              <label>SEBI Check Round</label>
+              <input type="number" id="new-game-sebi" value="4" />
+            </div>
+          </div>
+
+          <div style="display:flex; gap:1rem; margin-top:1.5rem;">
+            <button class="btn btn-primary" id="btn-confirm-new-game" style="flex:1; justify-content:center;">✨ CREATE GAME</button>
+            <button class="btn btn-outline" onclick="closeNewGameModal()" style="flex:1; justify-content:center;">CANCEL</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GAME HISTORY PANEL -->
+      <div id="host-history-panel" class="hidden" style="margin:0 0 1.5rem 0;">
+        <div class="host-card">
+          <h3>📜 GAME HISTORY</h3>
+          <div id="host-history-list"></div>
+        </div>
+      </div>
+
 
         <!-- Special Event Action Bar -->
         <div class="host-actions-bar">

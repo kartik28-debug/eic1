@@ -37,6 +37,10 @@ const pool = new Pool({
     : { rejectUnauthorized: false }
 });
 
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle pg client:', err.message || err);
+});
+
 // Auto-verify Market Mayhem DB Schema on startup
 initMarketMayhemSchema(pool).catch(err => {
   console.error('Failed to initialize Market Mayhem DB Schema:', err);

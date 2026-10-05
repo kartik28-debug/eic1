@@ -215,7 +215,38 @@ function initSocketConnection() {
 
   socket.on('phase-changed', async ({ status, currentPhase, currentRound }) => {
     console.log('[MM] phase-changed received:', { status, currentPhase, currentRound });
+    if (status === 'ENDED') {
+      // Game ended — show results immediately
+      await showResultsSection();
+      return;
+    }
     await loadInitialState();
+  });
+
+  // game-ended: host ended the game — transition ALL players to results screen immediately
+  socket.on('game-ended', async ({ gameId, leaderboard, message }) => {
+    console.log('[MM] game-ended received for game', gameId);
+    // Update local game state
+    if (activeGame) activeGame.status = 'ENDED';
+
+    // Show a brief banner before transitioning
+    const eventBanner = document.getElementById('mm-event-banner');
+    const eventContent = document.getElementById('mm-event-content');
+    if (eventBanner && eventContent) {
+      eventContent.innerHTML = `<div class="event-item"><p><strong>🏁 GAME OVER:</strong> ${message || 'The game has ended. Displaying final results...'}</p></div>`;
+      eventBanner.classList.remove('hidden');
+    }
+
+    // If we already have the leaderboard, render it immediately
+    if (leaderboard && leaderboard.length > 0) {
+      currentLeaderboard = leaderboard;
+      renderLeaderboard(leaderboard);
+    }
+
+    // Transition to results screen after a brief 1.5s pause
+    setTimeout(async () => {
+      await showResultsSection();
+    }, 1500);
   });
 
   socket.on('game-paused', () => {
