@@ -680,15 +680,15 @@ function renderTipShop(tips) {
     return `
       <div class="tip-card ${tip.is_super_tip ? 'super-tip' : ''}">
         ${tip.is_super_tip ? '<span class="super-badge">⚡ SUPER TIP</span>' : ''}
-        <div class="tip-source">PRIVATE INTEL</div>
-        <div class="tip-stock-tag">Linked Stock: ${tip.stock_name} (${tip.stock_ticker})</div>
-        <p class="tip-preview">${isBought ? 'TIP UNLOCKED' : '🔒 CLASSIFIED — PURCHASE TO REVEAL'}</p>
+        <div class="tip-source">SOURCE: ${tip.source_label || 'Private Intel'}</div>
+        <div class="tip-stock-tag">Linked Stock: <strong>${tip.stock_name} (${tip.stock_ticker})</strong></div>
+        <p class="tip-preview">${isBought ? '✅ TIP UNLOCKED — see purchased tips below' : '🔒 CLASSIFIED — Purchase to reveal insider information'}</p>
         <div class="tip-price">Cost: ₹${parseFloat(tip.price).toLocaleString('en-IN')}</div>
-        
+
         <button class="btn ${tip.is_super_tip ? 'btn-primary' : 'btn-secondary'} buy-tip-btn"
                 ${(isBought || !isTipPhase || boughtCount >= 2) ? 'disabled' : ''}
                 onclick="window.buyTip(${tip.id})">
-          ${isBought ? '✅ PURCHASED' : 'BUY PRIVATE TIP'}
+          ${isBought ? '✅ PURCHASED' : (isTipPhase ? 'BUY PRIVATE TIP' : '🔒 TIP SHOP CLOSED')}
         </button>
       </div>
     `;

@@ -280,10 +280,11 @@ async function changePhase(newPhase) {
       const currentP = hostActiveGame ? hostActiveGame.current_phase : 'LOBBY';
       const currentR = hostActiveGame ? hostActiveGame.current_round : 1;
 
-      if (currentP === 'LOBBY') payload = { newPhase: 'BLOCK_DEAL', newRound: 1 };
+      // Correct round flow: TIP_SHOP → BLOCK_DEAL → TRADING → REVEAL → NEXT_ROUND
+      if (currentP === 'LOBBY') payload = { newPhase: 'TIP_SHOP', newRound: 1 };
+      else if (currentP === 'TIP_SHOP') payload = { newPhase: 'BLOCK_DEAL', newRound: currentR };
       else if (currentP === 'BLOCK_DEAL') payload = { newPhase: 'TRADING', newRound: currentR };
-      else if (currentP === 'TRADING') payload = { newPhase: 'TIP_SHOP', newRound: currentR };
-      else if (currentP === 'TIP_SHOP') payload = { newPhase: 'REVEAL', newRound: currentR };
+      else if (currentP === 'TRADING') payload = { newPhase: 'REVEAL', newRound: currentR };
       else if (currentP === 'REVEAL') payload = { newPhase: 'NEXT_ROUND', newRound: currentR };
     }
     // END_GAME is handled by handleEndGame() directly — not via changePhase()

@@ -700,8 +700,10 @@ function setupMarketMayhem(app, io, pool) {
       `, [game.id, game.current_round]);
 
       // Available tips in Tip Shop for current round
+      // SECURITY: only return safe metadata — NEVER expose text, is_true, effect_size, is_flagged
       const availableTipsRes = await pool.query(`
-        SELECT t.id, t.round_number, t.stock_id, s.name as stock_name, s.ticker as stock_ticker, t.text, t.source_label, t.price, t.is_super_tip
+        SELECT t.id, t.round_number, t.stock_id, s.name as stock_name, s.ticker as stock_ticker,
+               t.source_label, t.price, t.is_super_tip
         FROM tips t
         JOIN stocks s ON s.id = t.stock_id
         WHERE t.game_id = $1 AND t.round_number = $2;
@@ -940,9 +942,10 @@ function setupMarketMayhem(app, io, pool) {
         return res.status(400).json({ success: false, message: 'Game is not active. Tip purchases are disabled.' });
       }
 
-      if (game.current_phase !== 'TIP_SHOP' && game.current_phase !== 'TRADING') {
+      // Security: tips can ONLY be purchased during TIP_SHOP phase
+      if (game.current_phase !== 'TIP_SHOP') {
         await client.query('ROLLBACK');
-        return res.status(400).json({ success: false, message: 'Tips can only be purchased during TIP_SHOP or TRADING phase.' });
+        return res.status(400).json({ success: false, message: 'Tips can only be purchased during the TIP_SHOP phase.' });
       }
 
       const memberRes = await client.query(`
@@ -977,6 +980,16 @@ function setupMarketMayhem(app, io, pool) {
       }
 
       const tip = tipRes.rows[0];
+
+      // Security: tip must belong to the current round
+      if (tip.round_number !== game.current_round) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          success: false,
+          message: `This tip is for Round ${tip.round_number}, not the current Round ${game.current_round}.`
+        });
+      }
+
       const price = parseFloat(tip.price);
 
       if (cashBalance < price) {
@@ -1178,7 +1191,7 @@ function setupMarketMayhem(app, io, pool) {
           return res.status(400).json({ success: false, message: 'Cannot start: no teams have registered yet.' });
         }
         statusToSet = 'ACTIVE';
-        phaseToSet = 'BLOCK_DEAL';
+        phaseToSet = 'TIP_SHOP';  // Every round starts with TIP_SHOP
         roundToSet = 1;
         isStartingGame = true;
       } else if (phaseToSet === 'END_GAME') {
@@ -1194,7 +1207,7 @@ function setupMarketMayhem(app, io, pool) {
           isEndingGame = true;
         } else {
           roundToSet += 1;
-          phaseToSet = 'BLOCK_DEAL';
+          phaseToSet = 'TIP_SHOP';  // Every new round begins with TIP_SHOP
         }
       }
 
@@ -1348,6 +1361,63 @@ function setupMarketMayhem(app, io, pool) {
       await client.query('ROLLBACK');
       console.error('New game creation error:', err);
       res.status(500).json({ success: false, message: `Failed to create new game: ${err.message}` });
+    } finally {
+      client.release();
+    }
+  });
+
+  // POST /api/market-mayhem/host/create-game — alias for /host/new-game (per spec)
+  // Identical logic: validates previous game ENDED, creates a fresh game with new ID
+  app.post('/api/market-mayhem/host/create-game', requireHost, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const { gameName, startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound } = req.body;
+
+      const currentActive = await getActiveGame();
+      if (currentActive) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot create new game: Game "${currentActive.name}" (ID #${currentActive.id}) is still active. End it first.`
+        });
+      }
+
+      const name = (gameName && gameName.trim()) || 'Market Mayhem';
+      const cash = parseFloat(startingCash) || 100000.00;
+      const teamSize = parseInt(maxTeamSize) || 4;
+      const timer = parseInt(roundTimerSeconds) || 120;
+      const penalty = parseFloat(penaltyPercentage) || 10.00;
+      const sebi = parseInt(sebiCheckRound) || 4;
+
+      await client.query('BEGIN');
+
+      const gameRes = await client.query(`
+        INSERT INTO games (name, status, starting_cash, max_team_size, round_timer_seconds, penalty_percentage, sebi_check_round, current_round, current_phase, allow_solo)
+        VALUES ($1, 'LOBBY', $2, $3, $4, $5, $6, 1, 'LOBBY', TRUE)
+        RETURNING *;
+      `, [name, cash, teamSize, timer, penalty, sebi]);
+
+      const newGame = gameRes.rows[0];
+      await seedNewGame(client, newGame.id);
+      await client.query('COMMIT');
+
+      console.log(`🎮 New game created via host/create-game: ID ${newGame.id} — ${newGame.name}`);
+
+      return res.json({
+        success: true,
+        message: `New game "${newGame.name}" created successfully.`,
+        game: {
+          id: newGame.id, name: newGame.name, status: newGame.status,
+          current_round: newGame.current_round, current_phase: newGame.current_phase,
+          starting_cash: newGame.starting_cash, max_team_size: newGame.max_team_size,
+          round_timer_seconds: newGame.round_timer_seconds, penalty_percentage: newGame.penalty_percentage,
+          sebi_check_round: newGame.sebi_check_round, allow_solo: newGame.allow_solo
+        }
+      });
+
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('Create game error:', err);
+      res.status(500).json({ success: false, message: `Failed to create game: ${err.message}` });
     } finally {
       client.release();
     }
