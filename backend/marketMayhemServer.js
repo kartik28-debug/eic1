@@ -514,7 +514,9 @@ function setupMarketMayhem(app, io, pool) {
 
       // Available tips in Tip Shop for current round
       const availableTipsRes = await pool.query(`
-        SELECT t.id, t.round_number, t.stock_id, s.name as stock_name, s.ticker as stock_ticker, t.text, t.source_label, t.price, t.is_super_tip
+        SELECT t.id, t.round_number, t.stock_id,
+               s.name as stock_name, s.ticker as stock_ticker,
+               t.source_label, t.price, t.is_super_tip
         FROM tips t
         JOIN stocks s ON s.id = t.stock_id
         WHERE t.game_id = $1 AND t.round_number = $2;
@@ -746,9 +748,9 @@ function setupMarketMayhem(app, io, pool) {
         return res.status(400).json({ success: false, message: 'No active game' });
       }
 
-      if (game.current_phase !== 'TIP_SHOP' && game.current_phase !== 'TRADING') {
+      if (game.status !== 'ACTIVE' || game.current_phase !== 'TIP_SHOP') {
         await client.query('ROLLBACK');
-        return res.status(400).json({ success: false, message: 'Tips can only be purchased during TIP_SHOP or TRADING phase.' });
+        return res.status(400).json({ success: false, message: 'Tips can only be purchased during the TIP_SHOP phase.' });
       }
 
       const memberRes = await client.query(`
@@ -775,8 +777,11 @@ function setupMarketMayhem(app, io, pool) {
         return res.status(400).json({ success: false, message: 'Maximum 2 tips allowed per team per round.' });
       }
 
-      // Get tip details
-      const tipRes = await client.query('SELECT * FROM tips WHERE id = $1 AND game_id = $2;', [tipId, game.id]);
+      // Get tip details and ensure it belongs to the current round.
+      const tipRes = await client.query(
+        'SELECT * FROM tips WHERE id = $1 AND game_id = $2 AND round_number = $3;',
+        [tipId, game.id, game.current_round]
+      );
       if (tipRes.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(400).json({ success: false, message: 'Tip not found.' });
@@ -973,7 +978,7 @@ function setupMarketMayhem(app, io, pool) {
           return res.status(400).json({ success: false, message: 'Cannot start: no teams have registered yet.' });
         }
         statusToSet = 'ACTIVE';
-        phaseToSet = 'BLOCK_DEAL';
+        phaseToSet = 'TIP_SHOP';
         roundToSet = 1;
         isStartingGame = true;
       } else if (phaseToSet === 'NEXT_ROUND') {
@@ -982,7 +987,7 @@ function setupMarketMayhem(app, io, pool) {
           phaseToSet = 'REVEAL';
         } else {
           roundToSet += 1;
-          phaseToSet = 'BLOCK_DEAL';
+          phaseToSet = 'TIP_SHOP';
         }
       }
 
@@ -1017,6 +1022,9 @@ function setupMarketMayhem(app, io, pool) {
       // If phase is TRADING, start timer
       if (phaseToSet === 'TRADING') {
         startRoundTimer(game.id, game.round_timer_seconds);
+      } else if (activeTimers[game.id] && activeTimers[game.id].intervalId) {
+        clearInterval(activeTimers[game.id].intervalId);
+        delete activeTimers[game.id];
       }
 
       // Emit phase-changed to all participants
