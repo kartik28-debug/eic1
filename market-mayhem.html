@@ -160,39 +160,40 @@
         <!-- Game Status & Phase Header Bar -->
         <div class="mm-game-header">
           <div class="header-badge-group">
-            <span class="round-badge" id="hud-round-badge">ROUND 1 / 5</span>
-            <span class="phase-badge" id="hud-phase-badge">PHASE: TRADING</span>
+            <span class="term-system-tag">[ MARKET MAYHEM // TERMINAL ]</span>
+            <span class="round-badge mono-num" id="hud-round-badge">ROUND 01 / 05</span>
+            <span class="phase-badge mono-num" id="hud-phase-badge">PHASE: TRADING</span>
           </div>
 
           <div class="timer-card" id="hud-timer-card">
-            <span class="timer-icon">⏱</span>
-            <span class="timer-text" id="hud-timer-text">02:00</span>
+            <span class="timer-label">TIME REMAINING</span>
+            <span class="timer-text mono-num" id="hud-timer-text">02:00</span>
           </div>
         </div>
 
-        <!-- Financial Summary Bar -->
+        <!-- Financial Telemetry Strip -->
         <div class="mm-financial-bar">
           <div class="fin-card">
-            <span class="fin-label">AVAILABLE CASH</span>
-            <span class="fin-value cyan" id="fin-cash">₹1,00,000</span>
+            <span class="fin-label">PORTFOLIO VALUE</span>
+            <span class="fin-value mono-num" id="fin-portfolio">₹0</span>
           </div>
           <div class="fin-card">
-            <span class="fin-label">PORTFOLIO VALUE</span>
-            <span class="fin-value" id="fin-portfolio">₹0</span>
+            <span class="fin-label">AVAILABLE CASH</span>
+            <span class="fin-value cyan mono-num" id="fin-cash">₹1,00,000</span>
+          </div>
+          <div class="fin-card">
+            <span class="fin-label">NET PROFIT / LOSS</span>
+            <span class="fin-value mono-num" id="fin-pnl">₹0 (0.00%)</span>
           </div>
           <div class="fin-card highlight">
-            <span class="fin-label">TOTAL TEAM VALUE</span>
-            <span class="fin-value gold" id="fin-total">₹1,00,000</span>
-          </div>
-          <div class="fin-card">
-            <span class="fin-label">PROFIT / LOSS</span>
-            <span class="fin-value" id="fin-pnl">₹0 (0.00%)</span>
+            <span class="fin-label">TOURNAMENT RANK</span>
+            <span class="fin-value gold mono-num" id="fin-rank">#--</span>
           </div>
         </div>
 
         <!-- Round Event Announcement Banner -->
         <div class="mm-event-banner hidden" id="mm-event-banner">
-          <div class="event-banner-tag">[ MARKET ANNOUNCEMENT ]</div>
+          <div class="event-banner-tag">⚠ MARKET EVENT DETECTED</div>
           <div class="event-banner-content" id="mm-event-content">
             <!-- Dynamically populated news/block deal -->
           </div>
@@ -200,7 +201,7 @@
 
         <!-- Super Tip Alert Banner -->
         <div class="mm-super-tip-banner hidden" id="mm-super-tip-banner">
-          <div class="super-tip-header">⚡ SUPER TIP ACQUIRED (PRIVATE TO YOUR TEAM)</div>
+          <div class="super-tip-header">⚡ HIGH CLEARANCE SUPER INTEL (PRIVATE TO YOUR TEAM)</div>
           <div class="super-tip-body" id="super-tip-body"></div>
         </div>
 
@@ -212,35 +213,125 @@
 
             <!-- Nav Tabs -->
             <div class="mm-tabs">
-              <button class="mm-tab-btn active" data-tab="tab-trading">📈 TRADING ARENA</button>
-              <button class="mm-tab-btn" data-tab="tab-tips">💡 TIP SHOP & PRIVATE TIPS</button>
-              <button class="mm-tab-btn" data-tab="tab-chart">📊 STOCK PRICE GRAPH</button>
+              <button class="mm-tab-btn active" data-tab="tab-trading">📈 TRADING TERMINAL</button>
+              <button class="mm-tab-btn" data-tab="tab-tips">🔒 INTELLIGENCE MARKET</button>
+              <button class="mm-tab-btn" data-tab="tab-chart">📊 MULTI-STOCK COMPARISON</button>
             </div>
 
-            <!-- Tab 1: Trading Arena -->
+            <!-- Tab 1: Trading Arena & Centerpiece -->
             <div class="tab-content active" id="tab-trading">
+              
+              <!-- VISUAL CENTERPIECE: MARKET TRADING TERMINAL -->
+              <div class="market-centerpiece" id="market-centerpiece">
+                
+                <!-- Stock Selector Bar (Ticker Tape) -->
+                <div class="market-ticker-tape" id="market-ticker-tape">
+                  <!-- Dynamically rendered 5 stock selector tabs -->
+                </div>
+
+                <!-- Active Stock Focus Cockpit -->
+                <div class="stock-cockpit" id="stock-cockpit">
+                  <div class="cockpit-header">
+                    <div class="cockpit-left">
+                      <div class="cockpit-meta-row">
+                        <span class="cockpit-ticker" id="cockpit-ticker">--</span>
+                        <span class="cockpit-sector" id="cockpit-sector">--</span>
+                        <span class="volatility-tag medium" id="cockpit-vol">MED VOL</span>
+                      </div>
+                      <h3 class="cockpit-name" id="cockpit-name">Select a Stock</h3>
+                      <p class="cockpit-desc" id="cockpit-desc">Live market data and order transmission console.</p>
+                    </div>
+                    <div class="cockpit-price-group">
+                      <div class="cockpit-price mono-num" id="cockpit-price">₹0.00</div>
+                      <span class="cockpit-change-pill pos mono-num" id="cockpit-change">+0.00%</span>
+                    </div>
+                  </div>
+                  <div class="cockpit-stats-bar">
+                    <div class="cockpit-stat-item"><span class="stat-label">OWNED:</span> <span class="stat-val mono-num" id="cockpit-owned">0 SHARES</span></div>
+                    <div class="cockpit-stat-item"><span class="stat-label">BASE PRICE:</span> <span class="stat-val mono-num" id="cockpit-base">₹0.00</span></div>
+                    <div class="cockpit-stat-item"><span class="stat-label">HOLDING VALUE:</span> <span class="stat-val mono-num" id="cockpit-holding-val">₹0</span></div>
+                  </div>
+                </div>
+
+                <!-- Large Centerpiece Price Chart -->
+                <div class="chart-cockpit-wrapper">
+                  <div class="chart-header-row">
+                    <span class="chart-title-tag">📈 PRICE HISTORY TRAJECTORY (M-6 → R5)</span>
+                    <div class="chart-controls">
+                      <button class="chart-btn-toggle active" id="chart-btn-focus">FOCUS STOCK</button>
+                      <button class="chart-btn-toggle" id="chart-btn-all">ALL STOCKS</button>
+                    </div>
+                  </div>
+                  <div class="centerpiece-chart-box">
+                    <canvas id="stockPricesChart"></canvas>
+                  </div>
+                </div>
+
+                <!-- Integrated Fast Terminal Order Desk -->
+                <div class="terminal-order-desk" id="terminal-order-desk">
+                  <div class="order-desk-grid">
+                    <div class="order-type-switch">
+                      <button class="desk-toggle-btn btn-buy active" id="desk-btn-buy">BUY</button>
+                      <button class="desk-toggle-btn btn-sell" id="desk-btn-sell">SELL</button>
+                    </div>
+                    <div class="order-qty-block">
+                      <div class="qty-input-row">
+                        <label style="font-family:var(--font-mono);font-size:0.68rem;color:var(--term-text-muted);">QTY:</label>
+                        <input type="number" id="desk-quantity-input" class="desk-qty-input" min="1" value="10" />
+                        <div class="qty-presets">
+                          <button type="button" class="qty-chip" id="chip-10">+10</button>
+                          <button type="button" class="qty-chip" id="chip-25">+25</button>
+                          <button type="button" class="qty-chip" id="chip-50">+50</button>
+                          <button type="button" class="qty-chip" id="chip-100">+100</button>
+                          <button type="button" class="qty-chip" id="chip-max">MAX</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="order-est-block">
+                      <span class="est-label">ESTIMATED TOTAL</span>
+                      <span class="est-val mono-num" id="desk-est-total">₹0</span>
+                    </div>
+                    <div class="order-action-block">
+                      <button class="term-action-btn btn-buy-action" id="desk-btn-submit">
+                        <span id="desk-submit-label">EXECUTE BUY</span>
+                      </button>
+                    </div>
+                  </div>
+                  <!-- Terminal Execution Feedback Log -->
+                  <div class="terminal-exec-log" id="trade-terminal-log">
+                    <span>&gt; READY FOR ORDERS // SELECT QUANTITY AND CONFIRM</span>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- 5-Stock Arena Cards Grid Overview -->
+              <div style="margin: 1.2rem 0 0.6rem; display:flex; justify-content:space-between; align-items:center;">
+                <span class="cyber-tag">[ ALL STOCKS OVERVIEW // CLICK ANY CARD TO FOCUS ]</span>
+              </div>
               <div class="stocks-grid" id="stocks-arena-grid">
                 <!-- 5 Stock Cards Rendered Here -->
               </div>
             </div>
 
-            <!-- Tab 2: Tip Shop -->
+            <!-- Tab 2: Intelligence Market (Tip Shop) -->
             <div class="tab-content" id="tab-tips">
               <div class="tip-shop-container">
                 <div class="tip-shop-header">
-                  <h3>PRIVATE INSIDER TIP SHOP</h3>
-                  <p class="tip-sub">Spend team cash to gain early market intelligence. Max 2 tips per team per round.</p>
-                  <div class="tip-counter-pill" id="tip-counter-pill">TIPS BOUGHT THIS ROUND: 0 / 2</div>
+                  <div class="cyber-tag">[ INTELLIGENCE MARKET // CLASSIFIED ]</div>
+                  <h3>HIGH-STAKES INSIDER INTELLIGENCE</h3>
+                  <p class="tip-sub">Spend team capital to acquire early market signals and regulatory intelligence. Limit: 2 dossiers per round.</p>
+                  <div class="tip-counter-pill" id="tip-counter-pill">INTEL DOSSIERS ACQUIRED: 0 / 2</div>
                 </div>
 
                 <div class="available-tips-grid" id="available-tips-grid">
-                  <!-- Tips for current round -->
+                  <!-- Classified dossiers for current round -->
                 </div>
 
                 <div class="purchased-tips-section">
-                  <h4>YOUR TEAM'S PURCHASED TIPS</h4>
+                  <h4>DECRYPTED TEAM INTELLIGENCE</h4>
                   <div class="purchased-tips-list" id="purchased-tips-list">
-                    <p class="empty-state">No tips purchased yet this round.</p>
+                    <p class="empty-state">No intel acquired for this round yet.</p>
                   </div>
                 </div>
               </div>
@@ -249,9 +340,10 @@
             <!-- Tab 3: Stock Price Chart -->
             <div class="tab-content" id="tab-chart">
               <div class="chart-card">
-                <h3>STOCK PRICE HISTORY (ROUNDS 0 – 5)</h3>
+                <h3>STOCK PRICE TRAJECTORY MATRIX (ROUNDS M-6 – R5)</h3>
+                <p style="font-size:0.8rem;color:var(--term-text-muted);margin-bottom:1rem;">Cross-market historical price volatility and fundamental performance curves.</p>
                 <div class="chart-container">
-                  <canvas id="stockPricesChart"></canvas>
+                  <canvas id="multiStockCompChart"></canvas>
                 </div>
               </div>
             </div>
@@ -262,18 +354,21 @@
           <div class="mm-sidebar-col">
 
             <!-- Holdings Box -->
-            <div class="sidebar-box">
-              <h4>YOUR TEAM HOLDINGS</h4>
+            <div class="sidebar-box" id="sidebar-holdings-box">
+              <div class="box-header">
+                <h4>PORTFOLIO HOLDINGS</h4>
+                <span class="cyber-tag">[ POSITIONS ]</span>
+              </div>
               <div class="holdings-list" id="holdings-list">
-                <p class="empty-state">No stock holdings yet. Buy stocks during the trading phase!</p>
+                <p class="empty-state">No stock holdings owned. Transmit orders during the trading phase.</p>
               </div>
             </div>
 
             <!-- Leaderboard Box -->
-            <div class="sidebar-box">
+            <div class="sidebar-box" id="sidebar-leaderboard-box">
               <div class="box-header">
-                <h4>LIVE LEADERBOARD</h4>
-                <span class="live-dot">●</span>
+                <h4>TOURNAMENT LEADERBOARD</h4>
+                <span class="live-dot">● LIVE</span>
               </div>
               <div class="leaderboard-table-wrapper">
                 <table class="mm-table">
@@ -281,7 +376,7 @@
                     <tr>
                       <th>#</th>
                       <th>TEAM</th>
-                      <th>TOTAL VALUE</th>
+                      <th style="text-align: right;">VALUATION &amp; RETURN</th>
                     </tr>
                   </thead>
                   <tbody id="leaderboard-tbody">
@@ -292,10 +387,13 @@
             </div>
 
             <!-- Trade History Stream -->
-            <div class="sidebar-box">
-              <h4>TEAM RECENT TRADES</h4>
+            <div class="sidebar-box" id="sidebar-trades-box">
+              <div class="box-header">
+                <h4>LIVE EXECUTION LOG</h4>
+                <span class="cyber-tag">[ AUDIT ]</span>
+              </div>
               <div class="trades-stream" id="trades-stream">
-                <p class="empty-state">No trades executed yet.</p>
+                <p class="empty-state">Awaiting execution orders...</p>
               </div>
             </div>
 
@@ -304,6 +402,20 @@
         </div>
 
       </section>
+
+      <!-- ROUND TRANSITION HERALD OVERLAY (ESPORTS MOMENT) -->
+      <div class="mm-modal-overlay hidden" id="round-transition-modal">
+        <div class="mm-modal-card" style="text-align: center; max-width: 440px; border-color: var(--term-cyan);">
+          <div class="modal-badge">[ ROUND ADVANCING ]</div>
+          <h1 style="font-family: var(--font-display); font-size: 2.4rem; margin: 0.4rem 0;" id="trans-round-title">ROUND 03</h1>
+          <p style="font-family: var(--font-mono); color: var(--term-cyan); font-size: 1.1rem; letter-spacing: 0.15em;" id="trans-phase-title">INTELLIGENCE MARKET</p>
+          <div style="margin: 1.4rem 0; padding: 1.2rem; background: var(--term-bg); border: 1px solid var(--term-border); border-radius: 3px;">
+            <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--term-text-muted); display: block; margin-bottom: 0.3rem;">ENTERING PHASE IN</span>
+            <span style="font-family: var(--font-mono); font-size: 2.2rem; font-weight: 700; color: var(--gold-trophy);" id="trans-countdown">03</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--term-text-muted);">Calibrate your strategy with your team members.</p>
+        </div>
+      </div>
 
       <!-- SECTION 3: REVEAL OVERLAY MODAL -->
       <div class="mm-modal-overlay hidden" id="reveal-modal">
@@ -345,9 +457,40 @@
             <p>Congratulations to all teams for completing the 5-round stock market simulation!</p>
           </div>
 
+          <!-- Champion Hero Showcase -->
+          <div id="final-champion-hero" class="final-champion-hero"></div>
+
           <!-- Podium / Leaderboard -->
           <div class="final-podium-grid" id="final-podium-grid">
             <!-- Top 3 Teams -->
+          </div>
+
+          <!-- My Team Result Card (if participant) -->
+          <div id="my-team-result-card" class="my-team-result-card hidden">
+            <!-- Dynamically populated with user's team rank, final valuation, and net P&L -->
+          </div>
+
+          <!-- Full Tournament Standings -->
+          <div class="debrief-box" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+            <h3>🏆 FINAL TOURNAMENT STANDINGS</h3>
+            <p class="debrief-sub">Complete institutional standings and net portfolio returns.</p>
+            <div class="leaderboard-table-wrapper">
+              <table class="mm-table">
+                <thead>
+                  <tr>
+                    <th>RANK</th>
+                    <th>TEAM</th>
+                    <th>CASH</th>
+                    <th>HOLDINGS</th>
+                    <th>TOTAL VALUATION</th>
+                    <th>TOTAL RETURN</th>
+                  </tr>
+                </thead>
+                <tbody id="final-standings-tbody">
+                  <!-- Standings rows -->
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <!-- Team Performance Graph -->
@@ -426,6 +569,7 @@
               <strong id="trade-est-total" class="gold">₹0</strong>
             </div>
           </div>
+          <div id="trade-modal-feedback" class="trade-modal-feedback hidden"></div>
           <div class="form-actions">
             <button class="btn btn-primary" id="btn-submit-trade">CONFIRM TRADE</button>
             <button class="btn btn-outline" id="btn-cancel-trade">CANCEL</button>

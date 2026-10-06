@@ -181,6 +181,26 @@ async function initMarketMayhemSchema(pool) {
       );
     `);
 
+    // 13. team_join_requests table — host-approval join flow
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS team_join_requests (
+        id SERIAL PRIMARY KEY,
+        game_id INT REFERENCES games(id) ON DELETE CASCADE,
+        team_id INT REFERENCES teams(id) ON DELETE CASCADE,
+        student_id INT REFERENCES students(id) ON DELETE CASCADE,
+        display_name VARCHAR(100) NOT NULL,
+        status VARCHAR(20) DEFAULT 'PENDING',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        UNIQUE(game_id, student_id)
+      );
+    `);
+
+    // Safe migration: add team_join_requests table if it does not already exist
+    await client.query(`
+      ALTER TABLE team_join_requests ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+    `);
+
     await client.query('COMMIT');
     console.log('✅ Market Mayhem database schema verified/created successfully.');
   } catch (err) {

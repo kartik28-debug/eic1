@@ -526,7 +526,349 @@ function setupMarketMayhem(app, io, pool) {
     }
   });
 
-  // 5. POST /api/market-mayhem/teams/join
+  // 5a. POST /api/market-mayhem/teams/join-request — Player submits a join request (host must approve)
+  app.post('/api/market-mayhem/teams/join-request', async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ success: false, message: 'Not authenticated' });
+      }
+
+      const { teamCode, displayName } = req.body;
+      if (!teamCode || !teamCode.trim()) {
+        return res.status(400).json({ success: false, message: 'Team code is required.' });
+      }
+
+      const game = await getActiveGame();
+      if (!game) return res.status(400).json({ success: false, message: 'No active game.' });
+
+      // Security: reject joining for ENDED games
+      if (game.status === 'ENDED') {
+        return res.status(400).json({ success: false, message: 'Game has ended. Joining disabled.' });
+      }
+
+      if (game.status !== 'LOBBY') {
+        return res.status(400).json({ success: false, message: 'Game has already started. Team join requests are disabled.' });
+      }
+
+      // Check if student is already in a team
+      const existing = await pool.query(`
+        SELECT tm.id FROM team_members tm
+        JOIN teams t ON t.id = tm.team_id
+        WHERE tm.student_id = $1 AND t.game_id = $2;
+      `, [req.session.userId, game.id]);
+
+      if (existing.rows.length > 0) {
+        return res.status(400).json({ success: false, message: 'You are already in a team.' });
+      }
+
+      // Find team by code
+      const teamRes = await pool.query(`
+        SELECT id, team_name, team_code, cash_balance FROM teams
+        WHERE game_id = $1 AND UPPER(team_code) = $2;
+      `, [game.id, teamCode.trim().toUpperCase()]);
+
+      if (teamRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Invalid team code.' });
+      }
+
+      const team = teamRes.rows[0];
+
+      // Check capacity
+      const countRes = await pool.query('SELECT COUNT(*) FROM team_members WHERE team_id = $1;', [team.id]);
+      const currentCount = parseInt(countRes.rows[0].count);
+      if (currentCount >= game.max_team_size) {
+        return res.status(400).json({ success: false, message: `Team is full (Max ${game.max_team_size} members).` });
+      }
+
+      const playerDispName = (displayName && displayName.trim()) || req.session.name || 'Player';
+
+      // Upsert: if player already has a pending request for this game, update it (same game, different team code attempt)
+      // UNIQUE(game_id, student_id) — one active request per game per student
+      const existingReq = await pool.query(
+        'SELECT id, status, team_id FROM team_join_requests WHERE game_id = $1 AND student_id = $2;',
+        [game.id, req.session.userId]
+      );
+
+      if (existingReq.rows.length > 0) {
+        const prev = existingReq.rows[0];
+        if (prev.status === 'PENDING') {
+          // Update existing pending request to new team
+          await pool.query(
+            'UPDATE team_join_requests SET team_id = $1, display_name = $2, created_at = CURRENT_TIMESTAMP WHERE id = $3;',
+            [team.id, playerDispName, prev.id]
+          );
+        } else if (prev.status === 'APPROVED') {
+          return res.status(400).json({ success: false, message: 'Your join request was already approved. You are in a team.' });
+        } else {
+          // REJECTED — allow retrying with a new request
+          await pool.query(
+            'UPDATE team_join_requests SET team_id = $1, display_name = $2, status = $3, created_at = CURRENT_TIMESTAMP, reviewed_at = NULL WHERE id = $4;',
+            [team.id, playerDispName, 'PENDING', prev.id]
+          );
+        }
+      } else {
+        // Insert new request
+        await pool.query(
+          'INSERT INTO team_join_requests (game_id, team_id, student_id, display_name, status) VALUES ($1, $2, $3, $4, $5);',
+          [game.id, team.id, req.session.userId, playerDispName, 'PENDING']
+        );
+      }
+
+      // Get updated request
+      const reqRow = await pool.query(
+        'SELECT id FROM team_join_requests WHERE game_id = $1 AND student_id = $2;',
+        [game.id, req.session.userId]
+      );
+      const requestId = reqRow.rows[0].id;
+
+      // Notify host via Socket.IO (broadcast to game room so host sees it live)
+      io.to(`game_${game.id}`).emit('team-join-request', {
+        requestId,
+        gameId: game.id,
+        teamId: team.id,
+        teamName: team.team_name,
+        studentId: req.session.userId,
+        displayName: playerDispName,
+        createdAt: new Date().toISOString()
+      });
+
+      console.log(`📨 Join request: "${playerDispName}" → Team "${team.team_name}" (Game ${game.id})`);
+
+      return res.json({
+        success: true,
+        requestPending: true,
+        message: 'Join request submitted. Waiting for host approval.',
+        requestId,
+        teamName: team.team_name
+      });
+
+    } catch (err) {
+      console.error('Join request error:', err);
+      res.status(500).json({ success: false, message: 'Failed to submit join request.' });
+    }
+  });
+
+  // 5b. GET /api/market-mayhem/teams/my-request — Player polls their request status
+  app.get('/api/market-mayhem/teams/my-request', async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ success: false, message: 'Not authenticated' });
+      }
+
+      let game = await getActiveGame();
+      if (!game) game = await getLatestEndedGame();
+      if (!game) return res.json({ success: true, hasRequest: false });
+
+      const reqRes = await pool.query(`
+        SELECT tjr.id, tjr.status, tjr.display_name, tjr.created_at, tjr.reviewed_at,
+               t.team_name, t.team_code, t.id as team_id
+        FROM team_join_requests tjr
+        JOIN teams t ON t.id = tjr.team_id
+        WHERE tjr.game_id = $1 AND tjr.student_id = $2
+        ORDER BY tjr.created_at DESC LIMIT 1;
+      `, [game.id, req.session.userId]);
+
+      if (reqRes.rows.length === 0) {
+        return res.json({ success: true, hasRequest: false });
+      }
+
+      const r = reqRes.rows[0];
+      return res.json({
+        success: true,
+        hasRequest: true,
+        request: {
+          id: r.id,
+          status: r.status,
+          displayName: r.display_name,
+          teamName: r.team_name,
+          teamCode: r.team_code,
+          teamId: r.team_id,
+          createdAt: r.created_at,
+          reviewedAt: r.reviewed_at
+        }
+      });
+
+    } catch (err) {
+      console.error('Get my request error:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // 5c. GET /api/market-mayhem/host/join-requests — Host views all pending requests
+  app.get('/api/market-mayhem/host/join-requests', requireHost, async (req, res) => {
+    try {
+      const game = await getActiveGame();
+      if (!game) return res.json({ success: true, requests: [] });
+
+      const result = await pool.query(`
+        SELECT tjr.id, tjr.status, tjr.display_name, tjr.created_at,
+               t.id as team_id, t.team_name, t.team_code,
+               s.id as student_id, s.name as student_real_name
+        FROM team_join_requests tjr
+        JOIN teams t ON t.id = tjr.team_id
+        JOIN students s ON s.id = tjr.student_id
+        WHERE tjr.game_id = $1 AND tjr.status = 'PENDING'
+        ORDER BY tjr.created_at ASC;
+      `, [game.id]);
+
+      return res.json({ success: true, requests: result.rows, gameId: game.id });
+
+    } catch (err) {
+      console.error('Get join requests error:', err);
+      res.status(500).json({ success: false, message: 'Server error' });
+    }
+  });
+
+  // 5d. POST /api/market-mayhem/host/join-requests/:requestId/approve — Host approves a request
+  app.post('/api/market-mayhem/host/join-requests/:requestId/approve', requireHost, async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const requestId = parseInt(req.params.requestId);
+      if (isNaN(requestId)) return res.status(400).json({ success: false, message: 'Invalid request ID.' });
+
+      await client.query('BEGIN');
+
+      // Fetch the request with lock
+      const reqRes = await client.query(
+        'SELECT * FROM team_join_requests WHERE id = $1 FOR UPDATE;',
+        [requestId]
+      );
+      if (reqRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ success: false, message: 'Join request not found.' });
+      }
+
+      const joinReq = reqRes.rows[0];
+
+      if (joinReq.status !== 'PENDING') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: `Request is already ${joinReq.status}. Cannot approve.` });
+      }
+
+      // Verify game is still in LOBBY
+      const gameRes = await client.query('SELECT * FROM games WHERE id = $1;', [joinReq.game_id]);
+      const game = gameRes.rows[0];
+      if (!game || game.status !== 'LOBBY') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: 'Game has already started. Cannot approve new members.' });
+      }
+
+      // Check student not already in a team (race condition guard)
+      const existingMember = await client.query(`
+        SELECT tm.id FROM team_members tm
+        JOIN teams t ON t.id = tm.team_id
+        WHERE tm.student_id = $1 AND t.game_id = $2;
+      `, [joinReq.student_id, joinReq.game_id]);
+
+      if (existingMember.rows.length > 0) {
+        await client.query('UPDATE team_join_requests SET status = $1, reviewed_at = CURRENT_TIMESTAMP WHERE id = $2;', ['APPROVED', requestId]);
+        await client.query('COMMIT');
+        return res.json({ success: true, message: 'Player is already a team member (approved).' });
+      }
+
+      // Check team capacity
+      const countRes = await client.query('SELECT COUNT(*) FROM team_members WHERE team_id = $1;', [joinReq.team_id]);
+      const currentCount = parseInt(countRes.rows[0].count);
+      const maxSize = game.max_team_size;
+
+      if (currentCount >= maxSize) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ success: false, message: `Team is full (${maxSize} members). Cannot approve.` });
+      }
+
+      // Add to team_members
+      await client.query(
+        'INSERT INTO team_members (team_id, student_id, display_name) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING;',
+        [joinReq.team_id, joinReq.student_id, joinReq.display_name]
+      );
+
+      // Mark request as APPROVED
+      await client.query(
+        'UPDATE team_join_requests SET status = $1, reviewed_at = CURRENT_TIMESTAMP WHERE id = $2;',
+        ['APPROVED', requestId]
+      );
+
+      await client.query('COMMIT');
+
+      // Get team info for notification
+      const teamRes = await pool.query('SELECT team_name, team_code FROM teams WHERE id = $1;', [joinReq.team_id]);
+      const teamName = teamRes.rows[0]?.team_name || 'Team';
+      const teamCode = teamRes.rows[0]?.team_code || '';
+
+      // Get member list for team update
+      const membersRes = await pool.query('SELECT student_id, display_name, joined_at FROM team_members WHERE team_id = $1;', [joinReq.team_id]);
+
+      // Notify the player socket (they listen to player_<studentId> room)
+      io.to(`player_${joinReq.student_id}`).emit('team-join-approved', {
+        requestId,
+        teamId: joinReq.team_id,
+        teamName,
+        teamCode,
+        displayName: joinReq.display_name
+      });
+
+      // Notify lobby
+      io.to(`game_${joinReq.game_id}`).emit('lobby-updated', { gameId: joinReq.game_id });
+      io.to(`team_${joinReq.team_id}`).emit('team-updated', { teamId: joinReq.team_id, members: membersRes.rows });
+
+      console.log(`✅ Approved join request ${requestId}: "${joinReq.display_name}" → Team "${teamName}"`);
+
+      return res.json({ success: true, message: `Approved: ${joinReq.display_name} joined ${teamName}.`, teamId: joinReq.team_id, teamName });
+
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('Approve request error:', err);
+      res.status(500).json({ success: false, message: 'Failed to approve request.' });
+    } finally {
+      client.release();
+    }
+  });
+
+  // 5e. POST /api/market-mayhem/host/join-requests/:requestId/reject — Host rejects a request
+  app.post('/api/market-mayhem/host/join-requests/:requestId/reject', requireHost, async (req, res) => {
+    try {
+      const requestId = parseInt(req.params.requestId);
+      if (isNaN(requestId)) return res.status(400).json({ success: false, message: 'Invalid request ID.' });
+
+      const reqRes = await pool.query('SELECT * FROM team_join_requests WHERE id = $1;', [requestId]);
+      if (reqRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Join request not found.' });
+      }
+
+      const joinReq = reqRes.rows[0];
+
+      if (joinReq.status !== 'PENDING') {
+        return res.status(400).json({ success: false, message: `Request is already ${joinReq.status}. Cannot reject.` });
+      }
+
+      await pool.query(
+        'UPDATE team_join_requests SET status = $1, reviewed_at = CURRENT_TIMESTAMP WHERE id = $2;',
+        ['REJECTED', requestId]
+      );
+
+      // Get team name for notification
+      const teamRes = await pool.query('SELECT team_name FROM teams WHERE id = $1;', [joinReq.team_id]);
+      const teamName = teamRes.rows[0]?.team_name || 'Team';
+
+      // Notify the player socket
+      io.to(`player_${joinReq.student_id}`).emit('team-join-rejected', {
+        requestId,
+        teamId: joinReq.team_id,
+        teamName,
+        displayName: joinReq.display_name
+      });
+
+      console.log(`❌ Rejected join request ${requestId}: "${joinReq.display_name}" for Team "${teamName}"`);
+
+      return res.json({ success: true, message: `Rejected: ${joinReq.display_name}'s request to join ${teamName}.` });
+
+    } catch (err) {
+      console.error('Reject request error:', err);
+      res.status(500).json({ success: false, message: 'Failed to reject request.' });
+    }
+  });
+
+  // 5. POST /api/market-mayhem/teams/join (kept for backward compat — same logic but direct join, no host approval)
   app.post('/api/market-mayhem/teams/join', async (req, res) => {
     try {
       if (!req.session.userId) {
@@ -1751,7 +2093,7 @@ function setupMarketMayhem(app, io, pool) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   io.on('connection', (socket) => {
     // Player or host joins the game room
-    socket.on('join-game-room', ({ gameId, teamId }) => {
+    socket.on('join-game-room', ({ gameId, teamId, studentId }) => {
       if (gameId) {
         socket.join(`game_${gameId}`);
         console.log(`Socket ${socket.id} joined room: game_${gameId}`);
@@ -1759,6 +2101,19 @@ function setupMarketMayhem(app, io, pool) {
       if (teamId) {
         socket.join(`team_${teamId}`);
         console.log(`Socket ${socket.id} joined room: team_${teamId}`);
+      }
+      // Join personal room so host can send direct notifications to this player
+      if (studentId) {
+        socket.join(`player_${studentId}`);
+        console.log(`Socket ${socket.id} joined room: player_${studentId}`);
+      }
+    });
+
+    // Explicit player room join (called separately for join-request notification flow)
+    socket.on('join-player-room', ({ studentId }) => {
+      if (studentId) {
+        socket.join(`player_${studentId}`);
+        console.log(`Socket ${socket.id} joined room: player_${studentId}`);
       }
     });
 

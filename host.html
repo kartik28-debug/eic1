@@ -63,12 +63,12 @@
         <!-- Host Header & Master Controls -->
         <div class="mm-host-header-bar">
           <div class="status-info">
-            <span class="cyber-tag">[ GAME CONTROL CENTER ]</span>
+            <span class="cyber-tag">[ MISSION CONTROL // HOST COMMAND DESK ]</span>
             <h2 id="host-game-title">Market Mayhem Season 1</h2>
             <div class="host-badge-row">
-              <span class="round-badge" id="host-round-badge">ROUND 1 / 5</span>
-              <span class="phase-badge" id="host-phase-badge">STATUS: LOBBY</span>
-              <span class="timer-badge" id="host-timer-badge">⏱ 02:00</span>
+              <span class="round-badge mono-num" id="host-round-badge">ROUND 1 / 5</span>
+              <span class="phase-badge mono-num" id="host-phase-badge">STATUS: LOBBY</span>
+              <span class="timer-badge mono-num" id="host-timer-badge">⏱ 02:00</span>
             </div>
           </div>
 
@@ -84,12 +84,15 @@
           <!-- GAME ENDED state panel -->
           <div class="host-controls-group" id="host-ended-controls" style="display:none;">
             <div style="display:flex; align-items:center; gap:1.5rem; flex-wrap:wrap;">
-              <span style="color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-size:1rem; letter-spacing:0.1em;">🏁 GAME ENDED</span>
+              <span style="color: var(--term-cyan); font-family: var(--font-mono); font-size:1rem; letter-spacing:0.1em; font-weight:700;">🏁 SESSION CONCLUDED</span>
               <button class="btn btn-primary" id="host-btn-new-game" onclick="openNewGameModal()">➕ CREATE NEW GAME</button>
               <button class="btn btn-outline" id="host-btn-view-history" onclick="loadGameHistory()">📜 VIEW GAME HISTORY</button>
             </div>
           </div>
         </div>
+
+        <!-- Host Event Alert Banner -->
+        <div id="host-event-banner" class="mm-event-banner hidden"></div>
 
       <!-- CREATE NEW GAME MODAL -->
       <div id="new-game-modal" class="mm-modal-overlay hidden">

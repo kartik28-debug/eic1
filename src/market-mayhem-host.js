@@ -83,10 +83,15 @@ async function handleHostLogin() {
 }
 
 async function checkHostSession() {
-  // Attempt to fetch game state to check if host is authorized
-  const res = await fetch(`${API_BASE}/api/market-mayhem/active-game`, { credentials: 'include' });
-  if (res.ok) {
-    showHostDashboard();
+  // Verify host session using a requireHost-protected endpoint
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests`, { credentials: 'include' });
+    if (res.ok) {
+      showHostDashboard();
+    }
+    // If 403, stay on login screen (no action needed — auth section is already visible)
+  } catch (e) {
+    // Network error — stay on login screen
   }
 }
 
@@ -149,6 +154,19 @@ function initHostSocket() {
     }
     loadHostData();
   });
+
+  // ─── Receive live team join request from player ───
+  socket.on('team-join-request', (requestData) => {
+    console.log('[HOST] team-join-request received:', requestData);
+    // Pulse the requests section
+    const requestsSection = document.getElementById('host-join-requests-section');
+    if (requestsSection) {
+      requestsSection.classList.add('request-pulse');
+      setTimeout(() => requestsSection.classList.remove('request-pulse'), 2000);
+    }
+    // Reload to update the list
+    loadJoinRequests();
+  });
 }
 
 async function loadHostData() {
@@ -163,6 +181,9 @@ async function loadHostData() {
       if (socket && socket.connected) {
         socket.emit('join-game-room', { gameId: hostActiveGame.id });
       }
+
+      // Load join requests for active game
+      await loadJoinRequests();
     } else {
       // No active game found (all games ENDED or none exist yet)
       hostActiveGame = null;
@@ -171,6 +192,8 @@ async function loadHostData() {
       if (title) title.textContent = 'No Active Game';
       if (phaseBadge) phaseBadge.textContent = 'STATUS: ENDED';
       showEndedControls(true); // show CREATE NEW GAME panel
+      // Clear join requests when no active game
+      renderJoinRequests([]);
     }
 
 
@@ -188,6 +211,112 @@ async function loadHostData() {
     console.error('Error loading host data:', e);
   }
 }
+
+async function loadJoinRequests() {
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests`, { credentials: 'include' });
+    const data = await res.json();
+    if (data.success) {
+      renderJoinRequests(data.requests || []);
+    }
+  } catch (e) {
+    console.error('Error loading join requests:', e);
+  }
+}
+
+function renderJoinRequests(requests) {
+  const container = document.getElementById('host-join-requests-list');
+  const countBadge = document.getElementById('host-join-requests-count');
+  if (!container) return;
+
+  const pending = requests.filter(r => r.status === 'PENDING');
+
+  if (countBadge) {
+    countBadge.textContent = pending.length > 0 ? `● ${pending.length}` : '';
+    countBadge.style.color = pending.length > 0 ? 'var(--bear-red, #ff3366)' : '';
+  }
+
+  if (pending.length === 0) {
+    container.innerHTML = '<p class="empty-state">No pending team requests.</p>';
+    return;
+  }
+
+  container.innerHTML = pending.map(r => `
+    <div class="join-request-card" id="req-card-${r.id}">
+      <div class="req-card-info">
+        <div class="req-player-name">${r.display_name}</div>
+        <div class="req-team-name">Requesting: <strong>${r.team_name}</strong> (${r.team_code})</div>
+        <div class="req-time" style="font-size:0.72rem; color:var(--term-text-muted); font-family:var(--font-mono);">${new Date(r.created_at).toLocaleTimeString()}</div>
+      </div>
+      <div class="req-card-actions">
+        <button class="btn btn-primary" style="padding:0.35rem 0.7rem; font-size:0.78rem;" onclick="window.approveRequest(${r.id})">APPROVE</button>
+        <button class="btn btn-secondary danger-btn" style="padding:0.35rem 0.7rem; font-size:0.78rem;" onclick="window.rejectRequest(${r.id})">REJECT</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+window.approveRequest = async (requestId) => {
+  const card = document.getElementById(`req-card-${requestId}`);
+  if (card) {
+    card.style.opacity = '0.5';
+    card.querySelectorAll('button').forEach(b => b.disabled = true);
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests/${requestId}/approve`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!data.success) {
+      alert(data.message);
+      if (card) { card.style.opacity = '1'; card.querySelectorAll('button').forEach(b => b.disabled = false); }
+      return;
+    }
+    // Remove card from UI
+    if (card) card.remove();
+    // Show brief banner
+    const banner = document.getElementById('host-event-banner');
+    if (banner) {
+      banner.textContent = `✅ APPROVED: ${data.message}`;
+      banner.style.display = 'block';
+      setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    }
+    loadJoinRequests();
+  } catch (e) {
+    alert('Failed to approve request.');
+  }
+};
+
+window.rejectRequest = async (requestId) => {
+  const card = document.getElementById(`req-card-${requestId}`);
+  if (card) {
+    card.style.opacity = '0.5';
+    card.querySelectorAll('button').forEach(b => b.disabled = true);
+  }
+  try {
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests/${requestId}/reject`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+    const data = await res.json();
+    if (!data.success) {
+      alert(data.message);
+      if (card) { card.style.opacity = '1'; card.querySelectorAll('button').forEach(b => b.disabled = false); }
+      return;
+    }
+    if (card) card.remove();
+    const banner = document.getElementById('host-event-banner');
+    if (banner) {
+      banner.textContent = `❌ REJECTED: ${data.message}`;
+      banner.style.display = 'block';
+      setTimeout(() => { banner.style.display = 'none'; }, 3000);
+    }
+    loadJoinRequests();
+  } catch (e) {
+    alert('Failed to reject request.');
+  }
+};
 
 function updateHostHeader(game) {
   const title = document.getElementById('host-game-title');
@@ -268,6 +397,20 @@ function updateHostTimerDisplay(remainingSeconds) {
   const mins = Math.floor(remainingSeconds / 60);
   const secs = remainingSeconds % 60;
   timerBadge.textContent = `⏱ ${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  
+  if (remainingSeconds <= 30) {
+    timerBadge.style.color = 'var(--bear-red)';
+    timerBadge.style.borderColor = 'rgba(255, 51, 102, 0.6)';
+    timerBadge.style.textShadow = '0 0 8px rgba(255, 51, 102, 0.4)';
+  } else if (remainingSeconds <= 60) {
+    timerBadge.style.color = 'var(--warn-amber)';
+    timerBadge.style.borderColor = 'rgba(255, 179, 0, 0.4)';
+    timerBadge.style.textShadow = 'none';
+  } else {
+    timerBadge.style.color = 'var(--term-cyan)';
+    timerBadge.style.borderColor = 'var(--term-border-light)';
+    timerBadge.style.textShadow = 'none';
+  }
 }
 
 // Host Phase State Machine Controller
@@ -476,6 +619,31 @@ async function resumeTimer() {
   }
 }
 
+function showHostNotification(msg, type = 'info') {
+  const banner = document.getElementById('host-event-banner');
+  if (!banner) return;
+  const isErr = type === 'error' || type === 'neg';
+  const isCrash = (msg || '').toLowerCase().includes('crash');
+  const isBull = (msg || '').toLowerCase().includes('bull');
+  
+  let icon = '⚡';
+  let tag = 'MISSION CONTROL NOTICE';
+  if (isCrash) { icon = '📉'; tag = 'CRASH EVENT TRIGGERED'; }
+  else if (isBull) { icon = '📈'; tag = 'BULL RUN TRIGGERED'; }
+  else if (isErr) { icon = '⚠️'; tag = 'SYSTEM WARNING'; }
+
+  banner.className = `mm-event-banner ${isCrash ? 'crash-event' : (isBull ? 'bull-event' : (isErr ? 'crash-event' : 'generic-event'))}`;
+  banner.innerHTML = `
+    <div class="event-headline-tag">${icon} ${tag}</div>
+    <div class="event-body-text">${msg}</div>
+  `;
+  banner.classList.remove('hidden');
+
+  setTimeout(() => {
+    banner.classList.add('hidden');
+  }, 7000);
+}
+
 // Special Host Event Triggers
 async function assignSuperTip() {
   try {
@@ -485,9 +653,9 @@ async function assignSuperTip() {
       credentials: 'include'
     });
     const data = await res.json();
-    alert(data.message);
+    showHostNotification(data.message, data.success ? 'info' : 'error');
   } catch (e) {
-    alert('Failed to assign super tip.');
+    showHostNotification('Failed to assign super tip.', 'error');
   }
 }
 
@@ -499,9 +667,9 @@ async function runSebiCheck() {
       credentials: 'include'
     });
     const data = await res.json();
-    alert(data.message);
+    showHostNotification(data.message, data.success ? 'info' : 'error');
   } catch (e) {
-    alert('SEBI Check execution failed.');
+    showHostNotification('SEBI Check execution failed.', 'error');
   }
 }
 
@@ -514,10 +682,10 @@ async function triggerMarketEvent(eventType) {
       body: JSON.stringify({ eventType })
     });
     const data = await res.json();
-    alert(data.message);
+    showHostNotification(data.message, data.success ? 'info' : 'error');
     loadHostData();
   } catch (e) {
-    alert('Market event trigger failed.');
+    showHostNotification('Market event trigger failed.', 'error');
   }
 }
 
@@ -538,34 +706,49 @@ async function saveConfiguration() {
       body: JSON.stringify({ startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound, allowSolo })
     });
     const data = await res.json();
-    alert(data.message);
+    showHostNotification(data.message, data.success ? 'info' : 'error');
     loadHostData();
   } catch (e) {
-    alert('Failed to save configuration.');
+    showHostNotification('Failed to save configuration.', 'error');
   }
 }
 
-// Renderers for Host Monitoring
+// Renderers for Host Monitoring (Terminal & Control Room Polish)
 function renderHostTeams(teams) {
   const tbody = document.getElementById('host-teams-tbody');
   if (!tbody) return;
 
   if (teams.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No teams registered yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="font-family:var(--font-mono); color:var(--term-text-muted);">Awaiting team registrations...</td></tr>';
     return;
   }
 
-  tbody.innerHTML = teams.map(t => `
-    <tr>
-      <td><strong>#${t.rank}</strong></td>
-      <td><strong>${t.teamName}</strong></td>
-      <td><code>${t.teamCode}</code></td>
-      <td>${(t.members || []).length}</td>
-      <td>₹${Math.round(t.cashBalance).toLocaleString('en-IN')}</td>
-      <td>₹${Math.round(t.holdingsValue).toLocaleString('en-IN')}</td>
-      <td class="gold"><strong>₹${Math.round(t.totalValue).toLocaleString('en-IN')}</strong></td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = teams.map(t => {
+    let rankBadge = `#${t.rank.toString().padStart(2, '0')}`;
+    let rankStyle = '';
+    if (t.rank === 1) {
+      rankBadge = `🥇 #01`;
+      rankStyle = 'color: var(--gold-trophy); font-weight: 700;';
+    } else if (t.rank === 2) {
+      rankBadge = `🥈 #02`;
+      rankStyle = 'color: var(--silver-trophy); font-weight: 700;';
+    } else if (t.rank === 3) {
+      rankBadge = `🥉 #03`;
+      rankStyle = 'color: var(--bronze-trophy); font-weight: 700;';
+    }
+
+    return `
+      <tr>
+        <td class="mono-num" style="${rankStyle}">${rankBadge}</td>
+        <td><strong>${t.teamName}</strong></td>
+        <td><code class="mono-num" style="color:var(--term-cyan);">${t.teamCode}</code></td>
+        <td class="mono-num">${(t.members || []).length} / 4</td>
+        <td class="mono-num">₹${Math.round(t.cashBalance).toLocaleString('en-IN')}</td>
+        <td class="mono-num">₹${Math.round(t.holdingsValue).toLocaleString('en-IN')}</td>
+        <td class="gold mono-num font-bold"><strong>₹${Math.round(t.totalValue).toLocaleString('en-IN')}</strong></td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderHostPrices(priceHistory) {
@@ -575,12 +758,17 @@ function renderHostPrices(priceHistory) {
   const currentRound = hostActiveGame ? hostActiveGame.current_round : 1;
   const currentRoundPrices = priceHistory.filter(p => p.round_number === currentRound);
 
+  if (currentRoundPrices.length === 0) {
+    container.innerHTML = '<p class="empty-state" style="font-family:var(--font-mono);font-size:0.75rem;">Awaiting round price publication...</p>';
+    return;
+  }
+
   container.innerHTML = currentRoundPrices.map(p => `
     <div class="host-price-item">
       <div>
-        <strong>${p.name}</strong> (${p.ticker})
+        <strong style="color:#fff;">${p.name}</strong> <span class="mono-num" style="color:var(--term-cyan); margin-left:0.3rem;">[${p.ticker}]</span>
       </div>
-      <div class="cyan">₹${parseFloat(p.price).toLocaleString('en-IN')}</div>
+      <div class="cyan mono-num font-bold" style="font-size:1.05rem;">₹${parseFloat(p.price).toLocaleString('en-IN')}</div>
     </div>
   `).join('');
 }
@@ -589,17 +777,22 @@ function renderHostMasterTips(tips) {
   const container = document.getElementById('host-tips-list');
   if (!container) return;
 
+  if (tips.length === 0) {
+    container.innerHTML = '<p class="empty-state" style="font-family:var(--font-mono);font-size:0.75rem;">No tips generated for current game.</p>';
+    return;
+  }
+
   container.innerHTML = tips.map(t => `
     <div class="host-tip-card ${t.is_super_tip ? 'super' : ''}">
       <div class="ht-header">
-        <span>R${t.round_number} — ${t.source_label} (${t.stock_ticker})</span>
-        <span class="ht-price">Cost: ₹${parseFloat(t.price).toLocaleString('en-IN')}</span>
+        <span class="mono-num">R${t.round_number} // ${t.source_label} [${t.stock_ticker}]</span>
+        <span class="ht-price mono-num">COST: ₹${parseFloat(t.price).toLocaleString('en-IN')}</span>
       </div>
       <p class="ht-text">"${t.text}"</p>
       <div class="ht-hidden-params">
-        <span class="param">Truth: <strong class="${t.is_true ? 'pos' : 'neg'}">${t.is_true ? 'TRUE' : 'FALSE'}</strong></span>
-        <span class="param">Effect: <strong>${t.effect_size > 0 ? '+' : ''}${t.effect_size}%</strong></span>
-        <span class="param">SEBI Flagged: <strong class="${t.is_flagged ? 'neg' : ''}">${t.is_flagged ? 'YES ⚠️' : 'NO'}</strong></span>
+        <span class="param">TRUTH: <strong class="${t.is_true ? 'pos' : 'neg'}">${t.is_true ? 'VERIFIED TRUE' : 'FALSE RUMOR'}</strong></span>
+        <span class="param">EFFECT: <strong class="mono-num">${t.effect_size > 0 ? '+' : ''}${t.effect_size}%</strong></span>
+        <span class="param">SEBI FLAGGED: <strong class="${t.is_flagged ? 'neg' : ''}">${t.is_flagged ? 'YES ⚠️' : 'CLEAR'}</strong></span>
       </div>
     </div>
   `).join('');
@@ -610,7 +803,7 @@ function renderHostTrades(trades) {
   if (!tbody) return;
 
   if (trades.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Awaiting player orders...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="font-family:var(--font-mono); color:var(--term-text-muted);">Awaiting order executions...</td></tr>';
     return;
   }
 
@@ -619,13 +812,13 @@ function renderHostTrades(trades) {
     const isBuy = t.type === 'BUY';
     return `
       <tr>
-        <td><code>${timeStr}</code></td>
+        <td><code class="mono-num" style="color:var(--term-text-muted);">${timeStr}</code></td>
         <td><strong>${t.teamName || 'Team'}</strong></td>
-        <td><span class="trade-type ${isBuy ? 'buy' : 'sell'}">${t.type}</span></td>
-        <td><strong>${t.stockTicker || t.stockName || ''}</strong></td>
-        <td>${t.quantity}</td>
-        <td>₹${parseFloat(t.price || 0).toLocaleString('en-IN')}</td>
-        <td class="cyan">₹${parseFloat(t.totalAmount || 0).toLocaleString('en-IN')}</td>
+        <td><span class="trade-type ${isBuy ? 'buy' : 'sell'}" style="font-family:var(--font-mono);">${t.type}</span></td>
+        <td><strong class="mono-num" style="color:var(--term-cyan);">${t.stockTicker || t.stockName || ''}</strong></td>
+        <td class="mono-num">${t.quantity}</td>
+        <td class="mono-num">₹${parseFloat(t.price || 0).toLocaleString('en-IN')}</td>
+        <td class="cyan mono-num font-bold">₹${parseFloat(t.totalAmount || 0).toLocaleString('en-IN')}</td>
       </tr>
     `;
   }).join('');
