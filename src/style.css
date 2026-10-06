@@ -974,9 +974,49 @@ body {
   box-shadow: 0 0 20px rgba(0, 229, 255, 0.18);
 }
 
+.member-avatar-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 1.2rem;
+}
+
+.member-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 25%;
+  border: 2px solid var(--cyan);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.22);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: block;
+}
+
+.member-card:hover .member-avatar-img {
+  transform: scale(1.06);
+  box-shadow: 0 0 25px rgba(0, 229, 255, 0.45);
+}
+
+.avatar-tag-overlay {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(5, 12, 24, 0.95);
+  border: 1px solid var(--cyan);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--cyan);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
 .member-avatar-placeholder {
-  width: 70px;
-  height: 70px;
+  width: 100px;
+  height: 100px;
   margin: 0 auto 1.2rem;
   border-radius: 50%;
   background: rgba(0, 229, 255, 0.06);

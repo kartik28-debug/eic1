@@ -6,7 +6,8 @@ const bcrypt = require('bcrypt');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const { Pool } = require('pg');
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const { setupMarketMayhem } = require('./marketMayhemServer');
 const { initMarketMayhemSchema } = require('./db/marketMayhemSchema');
@@ -32,9 +33,7 @@ const io = new Server(server, {
 // PostgreSQL Pool Connection (Neon database SSL configuration)
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('localhost')
-    ? false
-    : { rejectUnauthorized: false }
+  ssl: false
 });
 
 pool.on('error', (err) => {
