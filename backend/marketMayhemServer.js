@@ -1468,7 +1468,7 @@ function setupMarketMayhem(app, io, pool) {
 
   // Host auth middleware
   function requireHost(req, res, next) {
-    if (req.session.isHost || req.headers['x-host-key'] === (process.env.HOST_KEY || 'EIC_HOST_2026')) {
+    if (req.session.isHost || req.headers['x-host-key'] === (process.env.HOST_KEY || 'Kartik#28')) {
       return next();
     }
     return res.status(403).json({ success: false, message: 'Host authorization required.' });
@@ -1477,7 +1477,7 @@ function setupMarketMayhem(app, io, pool) {
   // POST /api/market-mayhem/host/login
   app.post('/api/market-mayhem/host/login', (req, res) => {
     const { hostKey } = req.body;
-    const validKey = process.env.HOST_KEY || 'EIC_HOST_2026';
+    const validKey = process.env.HOST_KEY || 'Kartik#28';
     if (hostKey === validKey) {
       req.session.isHost = true;
       return res.json({ success: true, message: 'Host logged in successfully.' });
