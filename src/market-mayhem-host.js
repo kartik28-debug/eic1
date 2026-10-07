@@ -12,6 +12,14 @@ const API_BASE = (typeof window !== 'undefined' && (window.location.hostname ===
 let socket = null;
 let hostActiveGame = null;
 
+function getHostHeaders(extra = {}) {
+  const hostKey = sessionStorage.getItem('mm_host_key');
+  return {
+    ...extra,
+    ...(hostKey ? { 'x-host-key': hostKey } : {})
+  };
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setupHostEventListeners();
   checkHostSession();
@@ -78,6 +86,10 @@ async function handleHostLogin() {
       return;
     }
 
+    if (hostKey) {
+      sessionStorage.setItem('mm_host_key', hostKey);
+    }
+
     showHostDashboard();
   } catch (e) {
     alert('Host login failed.');
@@ -87,7 +99,10 @@ async function handleHostLogin() {
 async function checkHostSession() {
   // Verify host session using a requireHost-protected endpoint
   try {
-    const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests`, { credentials: 'include' });
+    const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests`, {
+      headers: getHostHeaders(),
+      credentials: 'include'
+    });
     if (res.ok) {
       showHostDashboard();
     }
@@ -267,6 +282,7 @@ window.approveRequest = async (requestId) => {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests/${requestId}/approve`, {
       method: 'POST',
+      headers: getHostHeaders(),
       credentials: 'include'
     });
     const data = await res.json();
@@ -299,6 +315,7 @@ window.rejectRequest = async (requestId) => {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/join-requests/${requestId}/reject`, {
       method: 'POST',
+      headers: getHostHeaders(),
       credentials: 'include'
     });
     const data = await res.json();
@@ -436,7 +453,7 @@ async function changePhase(newPhase) {
 
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/phase-change`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify(payload)
     });
@@ -463,7 +480,7 @@ async function handleEndGame() {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/phase-change`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ newPhase: 'END_GAME' })
     });
@@ -518,7 +535,7 @@ async function createNewGame() {
     // Use dedicated /host/new-game endpoint which validates the previous game is ENDED
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/new-game`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ gameName, startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound })
     });
@@ -598,7 +615,7 @@ async function pauseTimer() {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/pause-timer`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include'
     });
     const data = await res.json();
@@ -611,7 +628,7 @@ async function resumeTimer() {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/resume-timer`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include'
     });
     const data = await res.json();
@@ -651,7 +668,7 @@ async function assignSuperTip() {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/super-tip/assign`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include'
     });
     const data = await res.json();
@@ -665,7 +682,7 @@ async function runSebiCheck() {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/sebi-check`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include'
     });
     const data = await res.json();
@@ -679,7 +696,7 @@ async function triggerMarketEvent(eventType) {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/market-event`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ eventType })
     });
@@ -703,7 +720,7 @@ async function saveConfiguration() {
   try {
     const res = await fetch(`${API_BASE}/api/market-mayhem/host/config`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getHostHeaders({ 'Content-Type': 'application/json' }),
       credentials: 'include',
       body: JSON.stringify({ startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound, allowSolo })
     });

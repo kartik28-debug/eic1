@@ -88,6 +88,7 @@ const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'eic-fallback-secret',
   resave: false,
   saveUninitialized: false,
+  proxy: isProduction, // Trust reverse proxy headers (X-Forwarded-Proto) for cookie generation on Render
   cookie: {
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
     httpOnly: true,

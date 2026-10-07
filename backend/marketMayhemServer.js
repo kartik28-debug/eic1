@@ -2274,9 +2274,20 @@ function setupMarketMayhem(app, io, pool) {
 
   // Host auth middleware
   function requireHost(req, res, next) {
-    if (req.session.isHost || req.headers['x-host-key'] === (process.env.HOST_KEY || 'Kartik#28')) {
+    const isHostSession = !!(req.session && req.session.isHost);
+    const validKey = process.env.HOST_KEY || 'Kartik#28';
+    const hasValidHeader = req.headers['x-host-key'] === validKey;
+
+    if (isHostSession || hasValidHeader) {
+      if (hasValidHeader && req.session && !req.session.isHost) {
+        req.session.isHost = true;
+        req.session.save((err) => {
+          if (err) console.error('[HOST AUTH] Error saving healed session:', err);
+        });
+      }
       return next();
     }
+    console.warn(`[HOST AUTH REJECT] Path: ${req.path} | hasSession: ${!!req.session} | isHost: ${req.session ? req.session.isHost : false} | hasCookie: ${!!req.headers.cookie}`);
     return res.status(403).json({ success: false, message: 'Host authorization required.' });
   }
 
@@ -2286,7 +2297,15 @@ function setupMarketMayhem(app, io, pool) {
     const validKey = process.env.HOST_KEY || 'Kartik#28';
     if (hostKey === validKey) {
       req.session.isHost = true;
-      return res.json({ success: true, message: 'Host logged in successfully.' });
+      req.session.save((err) => {
+        if (err) {
+          console.error('[HOST AUTH ERROR] Failed to save host session:', err);
+          return res.status(500).json({ success: false, message: 'Failed to save host session.' });
+        }
+        console.log(`[HOST AUTH] Host login successful | SessionID exists: ${!!req.sessionID} | isHost: ${req.session.isHost}`);
+        return res.json({ success: true, message: 'Host logged in successfully.' });
+      });
+      return;
     }
     return res.status(401).json({ success: false, message: 'Invalid Host Access Key.' });
   });
@@ -2456,6 +2475,7 @@ function setupMarketMayhem(app, io, pool) {
   // POST /api/market-mayhem/host/new-game — Create a fresh game after the current one ends
   // Validates previous game is ENDED before creating a new one with a new ID
   app.post('/api/market-mayhem/host/new-game', requireHost, async (req, res) => {
+    console.log(`[HOST AUTH] create-game (new-game) invoked | isHost: ${req.session ? req.session.isHost : false} | SessionID exists: ${!!req.sessionID}`);
     const client = await pool.connect();
     try {
       const { gameName, startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound } = req.body;
@@ -2524,6 +2544,7 @@ function setupMarketMayhem(app, io, pool) {
   // POST /api/market-mayhem/host/create-game — alias for /host/new-game (per spec)
   // Identical logic: validates previous game ENDED, creates a fresh game with new ID
   app.post('/api/market-mayhem/host/create-game', requireHost, async (req, res) => {
+    console.log(`[HOST AUTH] create-game invoked | isHost: ${req.session ? req.session.isHost : false} | SessionID exists: ${!!req.sessionID}`);
     const client = await pool.connect();
     try {
       const { gameName, startingCash, maxTeamSize, roundTimerSeconds, penaltyPercentage, sebiCheckRound } = req.body;
