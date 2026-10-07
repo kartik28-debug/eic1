@@ -113,7 +113,7 @@ function setupMarketMayhem(app, io, pool) {
           console.log(`✅ Seeded Round 4 events for Game ID ${gameId}`);
         }
 
-        // Check Round 4 SMBR super tip (Host-only, true tip, effect: -15.00)
+        // Check Round 4 SMBR insider tip (true tip, effect: -15.00, price: 3000)
         const checkTip = await pool.query('SELECT COUNT(*) FROM tips WHERE game_id = $1 AND round_number = 4;', [gameId]);
         if (parseInt(checkTip.rows[0].count) === 0) {
           const stocksRes = await pool.query('SELECT id, ticker FROM stocks WHERE game_id = $1;', [gameId]);
@@ -129,15 +129,21 @@ function setupMarketMayhem(app, io, pool) {
                 stockMap['SMBR'],
                 "SMBR's auditors have raised concerns about its accounts, and the promoter group is quietly selling shares. Expect a sharp fall.",
                 'Auditor',
-                0,
+                3000,
                 true,
                 true,
                 -15.00,
                 false
               ]
             );
-            console.log(`✅ Seeded Round 4 SMBR super tip for Game ID ${gameId}`);
+            console.log(`✅ Seeded Round 4 SMBR insider tip for Game ID ${gameId}`);
           }
+        } else {
+          // Update existing Round 4 tip price from 0 to 3000
+          await pool.query(
+            'UPDATE tips SET price = 3000 WHERE game_id = $1 AND round_number = 4 AND (price = 0 OR price IS NULL);',
+            [gameId]
+          );
         }
       }
     } catch (e) {
@@ -192,7 +198,7 @@ function setupMarketMayhem(app, io, pool) {
           console.log(`✅ Seeded Round 5 events for Game ID ${gameId}`);
         }
 
-        // Check Round 5 Insider Tips (Host-only, 5 tips)
+        // Check Round 5 Insider Tips (5 tips, prices 3000 / 1500)
         const checkTips = await pool.query('SELECT COUNT(*) FROM tips WHERE game_id = $1 AND round_number = 5;', [gameId]);
         if (parseInt(checkTips.rows[0].count) === 0) {
           const stocksRes = await pool.query('SELECT id, ticker FROM stocks WHERE game_id = $1;', [gameId]);
@@ -201,27 +207,27 @@ function setupMarketMayhem(app, io, pool) {
 
           const r5Tips = [
             {
-              ticker: 'RELY', source: 'Political Contact', price: 0, isSuper: true,
+              ticker: 'RELY', source: 'Political Contact', price: 3000, isSuper: true,
               isTrue: false, effect: -7.00, isFlagged: false,
               text: "Netaji Sahab was seen having chai with Mota Seth in a Delhi dhaba. A mega government contract for Relyant is signed, and the shares will zoom!"
             },
             {
-              ticker: 'ADHI', source: 'Research Analyst', price: 0, isSuper: true,
+              ticker: 'ADHI', source: 'Research Analyst', price: 1500, isSuper: true,
               isTrue: true, effect: -3.00, isFlagged: false,
               text: "Hindenbird Research is about to drop a 400-page report on Adhira. Their analyst has already sold his own flat to short the stock."
             },
             {
-              ticker: 'TATV', source: 'Government Source', price: 0, isSuper: true,
+              ticker: 'TATV', source: 'Government Source', price: 3000, isSuper: true,
               isTrue: true, effect: 3.00, isFlagged: false,
               text: "A minister's cousin says the electric-vehicle subsidy is coming, and he has already ordered 3 Tatva cars to be safe."
             },
             {
-              ticker: 'INFY-R', source: 'Corporate Insider', price: 0, isSuper: true,
+              ticker: 'INFY-R', source: 'Corporate Insider', price: 3000, isSuper: true,
               isTrue: true, effect: 4.00, isFlagged: false,
               text: "Infyra's biggest US client is quietly renewing its mega contract. The CEO was caught celebrating with extra filter coffee."
             },
             {
-              ticker: 'SMBR', source: 'Food Critic', price: 0, isSuper: true,
+              ticker: 'SMBR', source: 'Food Critic', price: 1500, isSuper: true,
               isTrue: false, effect: 0.00, isFlagged: false,
               text: "A famous food influencer tasted the sambar and made a face on camera. The shares will crash by Monday!"
             }
@@ -236,6 +242,16 @@ function setupMarketMayhem(app, io, pool) {
             }
           }
           console.log(`✅ Seeded Round 5 insider tips for Game ID ${gameId}`);
+        } else {
+          // Update existing Round 5 tip prices from 0 to 3000 / 1500
+          await pool.query(`
+            UPDATE tips SET price = CASE
+              WHEN source_label IN ('Political Contact', 'Government Source', 'Corporate Insider') THEN 3000
+              WHEN source_label IN ('Research Analyst', 'Food Critic') THEN 1500
+              ELSE 3000
+            END
+            WHERE game_id = $1 AND round_number = 5 AND (price = 0 OR price IS NULL);
+          `, [gameId]);
         }
       }
     } catch (e) {
@@ -933,11 +949,11 @@ function setupMarketMayhem(app, io, pool) {
       );
     }
 
-    // ── Round 4 Insider Tip (Host-only SMBR super tip) ──
+    // ── Round 4 Insider Tip (SMBR insider tip) ──
     const round4TipsData = [
       {
         round: 4, ticker: 'SMBR',
-        source: 'Auditor', price: 0, isSuper: true,
+        source: 'Auditor', price: 3000, isSuper: true,
         isTrue: true, effect: -15.00, isFlagged: false,
         text: "SMBR's auditors have raised concerns about its accounts, and the promoter group is quietly selling shares. Expect a sharp fall."
       }
@@ -1047,30 +1063,30 @@ function setupMarketMayhem(app, io, pool) {
       );
     }
 
-    // ── Round 5 Insider Tips (Host-only, 5 tips) ──
+    // ── Round 5 Insider Tips (5 tips) ──
     const round5TipsData = [
       {
-        round: 5, ticker: 'RELY', source: 'Political Contact', price: 0, isSuper: true,
+        round: 5, ticker: 'RELY', source: 'Political Contact', price: 3000, isSuper: true,
         isTrue: false, effect: -7.00, isFlagged: false,
         text: "Netaji Sahab was seen having chai with Mota Seth in a Delhi dhaba. A mega government contract for Relyant is signed, and the shares will zoom!"
       },
       {
-        round: 5, ticker: 'ADHI', source: 'Research Analyst', price: 0, isSuper: true,
+        round: 5, ticker: 'ADHI', source: 'Research Analyst', price: 1500, isSuper: true,
         isTrue: true, effect: -3.00, isFlagged: false,
         text: "Hindenbird Research is about to drop a 400-page report on Adhira. Their analyst has already sold his own flat to short the stock."
       },
       {
-        round: 5, ticker: 'TATV', source: 'Government Source', price: 0, isSuper: true,
+        round: 5, ticker: 'TATV', source: 'Government Source', price: 3000, isSuper: true,
         isTrue: true, effect: 3.00, isFlagged: false,
         text: "A minister's cousin says the electric-vehicle subsidy is coming, and he has already ordered 3 Tatva cars to be safe."
       },
       {
-        round: 5, ticker: 'INFY-R', source: 'Corporate Insider', price: 0, isSuper: true,
+        round: 5, ticker: 'INFY-R', source: 'Corporate Insider', price: 3000, isSuper: true,
         isTrue: true, effect: 4.00, isFlagged: false,
         text: "Infyra's biggest US client is quietly renewing its mega contract. The CEO was caught celebrating with extra filter coffee."
       },
       {
-        round: 5, ticker: 'SMBR', source: 'Food Critic', price: 0, isSuper: true,
+        round: 5, ticker: 'SMBR', source: 'Food Critic', price: 1500, isSuper: true,
         isTrue: false, effect: 0.00, isFlagged: false,
         text: "A famous food influencer tasted the sambar and made a face on camera. The shares will crash by Monday!"
       }
@@ -1845,7 +1861,8 @@ function setupMarketMayhem(app, io, pool) {
       const availableTipsRes = await pool.query(`
         SELECT t.id, t.round_number, t.source_label, t.price, t.is_super_tip
         FROM tips t
-        WHERE t.game_id = $1 AND t.round_number = $2 AND (t.is_super_tip = FALSE OR t.is_super_tip IS NULL);
+        WHERE t.game_id = $1 AND t.round_number = $2
+        ORDER BY t.id ASC;
       `, [game.id, game.current_round]);
 
       // Leaderboard
@@ -2126,15 +2143,6 @@ function setupMarketMayhem(app, io, pool) {
         return res.status(400).json({
           success: false,
           message: `This tip is for Round ${tip.round_number}, not the current Round ${game.current_round}.`
-        });
-      }
-
-      // Security: super tips are host-assigned only and cannot be purchased in the Tip Shop
-      if (tip.is_super_tip) {
-        await client.query('ROLLBACK');
-        return res.status(403).json({
-          success: false,
-          message: 'Classified super tips cannot be purchased in the Tip Shop.'
         });
       }
 
