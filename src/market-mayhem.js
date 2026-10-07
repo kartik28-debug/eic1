@@ -9,7 +9,9 @@ import { io } from 'socket.io-client';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173')
+  ? 'http://localhost:5000'
+  : '';
 
 // Global Client State
 let socket = null;
@@ -20,6 +22,7 @@ let availableTips = [];
 let purchasedTips = [];
 let currentStocks = [];
 let currentLeaderboard = [];
+let activeTrades = [];
 let selectedTradeStock = null;
 let stockChartInstance = null;
 let multiStockChartInstance = null;
@@ -241,6 +244,9 @@ function setupEventListeners() {
   if (closeReveal) {
     closeReveal.addEventListener('click', () => {
       document.getElementById('reveal-modal').classList.add('hidden');
+      if (activeGame && (activeGame.status === 'ENDED' || activeGame.currentRound >= 5)) {
+        showResultsSection();
+      }
     });
   }
 
@@ -260,7 +266,7 @@ function resetLobbyForms() {
 
 // ─── Socket.io Integration ───
 function initSocketConnection() {
-  socket = io(API_BASE, { withCredentials: true });
+  socket = io(API_BASE || undefined, { withCredentials: true });
 
   const statusText = document.getElementById('status-text');
   const statusPill = document.getElementById('connection-status');
@@ -303,6 +309,13 @@ function initSocketConnection() {
 
   socket.on('phase-changed', async ({ status, currentPhase, currentRound }) => {
     console.log('[MM] phase-changed received:', { status, currentPhase, currentRound });
+
+    // Close reveal modal whenever we leave the REVEAL phase
+    if (currentPhase !== 'REVEAL') {
+      const revealModal = document.getElementById('reveal-modal');
+      if (revealModal) revealModal.classList.add('hidden');
+    }
+
     if (status === 'ENDED') {
       // Game ended — show results immediately
       await showResultsSection();
@@ -475,6 +488,12 @@ async function loadInitialState() {
     purchasedTips = stateData.purchasedTips || [];
     activeHoldings = stateData.holdings || [];
     currentLeaderboard = stateData.leaderboard || [];
+    activeTrades = stateData.trades || [];
+
+    // Fallback: if /my-team didn't set currentTeam, but stateData has team
+    if (!currentTeam && stateData.team) {
+      currentTeam = stateData.team;
+    }
 
     if (socket && socket.connected) {
       const studentId = window._eicStudent ? window._eicStudent.id : null;
@@ -510,7 +529,10 @@ async function loadInitialState() {
 
   } catch (e) {
     console.error('Error loading initial state:', e);
-    showLobbySection();
+    // Only kick to lobby if student is genuinely not in a team/game
+    if (!currentTeam && (!activeGame || activeGame.status === 'LOBBY')) {
+      showLobbySection();
+    }
   }
 }
 
@@ -526,6 +548,7 @@ async function refreshPlayerState() {
       purchasedTips = data.purchasedTips || [];
       activeHoldings = data.holdings || [];
       currentLeaderboard = data.leaderboard || [];
+      activeTrades = data.trades || [];
 
       if (currentTeam && data.team) {
         currentTeam.cashBalance = data.team.cashBalance;
@@ -627,6 +650,19 @@ function updateDashboardUI(data) {
       eventBanner.classList.remove('hidden');
     } else if (eventBanner) {
       eventBanner.classList.add('hidden');
+    }
+  }
+
+  // Super Tip Banner for assigned teams (preserves banner across refresh and phase change)
+  const superTipBanner = document.getElementById('mm-super-tip-banner');
+  const superTipBody = document.getElementById('super-tip-body');
+  if (superTipBanner && superTipBody && activeGame) {
+    const activeSuperTip = (purchasedTips || []).find(pt => pt.is_super_tip && pt.round_number === activeGame.currentRound);
+    if (activeSuperTip) {
+      superTipBody.innerHTML = `<strong>${activeSuperTip.source_label}</strong> [Stock: ${activeSuperTip.stock_name || 'Sambar from Una'}]: "${activeSuperTip.text}"`;
+      superTipBanner.classList.remove('hidden');
+    } else {
+      superTipBanner.classList.add('hidden');
     }
   }
 
@@ -825,7 +861,7 @@ window.selectFocusedStock = (stockId) => {
 };
 
 // Quick preset chips setter
-window.setDeskQty = (val) => {
+function setDeskQty(val) {
   const deskQty = document.getElementById('desk-quantity-input');
   if (!deskQty || !focusedStockId) return;
 
@@ -847,7 +883,8 @@ window.setDeskQty = (val) => {
   }
 
   updateDeskEstTotal();
-};
+}
+window.setDeskQty = setDeskQty;
 
 function updateDeskEstTotal() {
   const stock = currentStocks.find(s => s.id === focusedStockId);
@@ -1259,7 +1296,7 @@ function renderHoldings(holdings) {
           const initialPrice = stock ? parseFloat(stock.initial_price || currentPrice) : currentPrice;
           
           // Calculate average buy execution price from trades
-          const buyTrades = activeTrades.filter(t => (t.stock_id === h.stock_id || t.ticker === h.ticker) && t.type === 'BUY');
+          const buyTrades = (activeTrades || []).filter(t => (t.stock_id === h.stock_id || t.ticker === h.ticker) && t.type === 'BUY');
           let avgPrice = initialPrice;
           if (buyTrades.length > 0) {
             const totalBuyCost = buyTrades.reduce((sum, tr) => sum + parseFloat(tr.total_value), 0);
@@ -1362,6 +1399,10 @@ function triggerRoundTransition(round, phase) {
   roundEl.textContent = `ROUND 0${round}`;
   phaseEl.textContent = phase.replace('_', ' ');
 
+  // Always close the reveal modal when a round transition fires
+  const revealModal = document.getElementById('reveal-modal');
+  if (revealModal) revealModal.classList.add('hidden');
+
   modal.classList.remove('hidden');
 
   let remaining = 3;
@@ -1387,7 +1428,15 @@ function renderRevealModal(stocks) {
   if (!modal || !grid) return;
 
   const currentRound = activeGame ? activeGame.currentRound : 1;
-  if (title) title.textContent = `MARKET REVEAL // ROUND 0${currentRound}`;
+  const isFinalRound = currentRound >= 5;
+  if (title) title.textContent = isFinalRound ? 'FINAL MARKET REVEAL // ROUND 05' : `MARKET REVEAL // ROUND 0${currentRound}`;
+
+  const btnClose = document.getElementById('btn-close-reveal');
+  if (btnClose) {
+    btnClose.textContent = (isFinalRound || (activeGame && activeGame.status === 'ENDED'))
+      ? 'VIEW FINAL RESULTS & PODIUM 🏆'
+      : 'CONTINUE TO GAME';
+  }
 
   if (!stocks || stocks.length === 0) return;
 
@@ -1744,7 +1793,7 @@ function renderFinalPodium(leaderboard, priceHistory = []) {
             </div>
             <div class="metric-item">
               <span class="label">NUMBER OF TRADES</span>
-              <span class="val mono-num font-bold">${activeTrades.length} EXECUTED</span>
+              <span class="val mono-num font-bold">${(activeTrades || []).length} EXECUTED</span>
             </div>
           </div>
         </div>

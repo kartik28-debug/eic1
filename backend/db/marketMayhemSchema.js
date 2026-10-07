@@ -150,9 +150,18 @@ async function initMarketMayhemSchema(pool) {
         stock_id INT REFERENCES stocks(id) ON DELETE CASCADE,
         block_deal_text TEXT,
         news_text TEXT,
-        true_price_change NUMERIC(5, 2) DEFAULT 0.0,
-        noise NUMERIC(5, 2) DEFAULT 0.0
+        true_price_change NUMERIC(8, 4) DEFAULT 0.0,
+        noise NUMERIC(8, 4) DEFAULT 0.0
       );
+    `);
+
+    // Safe migration: increase precision of true_price_change and noise
+    // to NUMERIC(8,4) to support values like -0.7375 and -0.213.
+    // This is a no-op if the columns are already at the right precision.
+    await client.query(`
+      ALTER TABLE round_events
+        ALTER COLUMN true_price_change TYPE NUMERIC(8, 4),
+        ALTER COLUMN noise TYPE NUMERIC(8, 4);
     `);
 
     // 11. team_value_history table

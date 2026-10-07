@@ -333,7 +333,8 @@
         <script>
           async function eicEnterGames() {
             try {
-              const res = await fetch('http://localhost:5000/api/auth/me', { credentials: 'include' });
+              const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173' ? 'http://localhost:5000' : '';
+              const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
               const data = await res.json();
               if (data.authenticated && !data.mustChangePassword) {
                 window.location.href = 'games.html';
@@ -368,10 +369,9 @@
             </div>
             <h3 class="member-name">ABHISHEK SHARMA</h3>
             <span class="member-role">President</span>
-            <p class="member-domain">Domain: Executive Leadership & Strategy</p>
+
             <div class="member-socials">
-              <span class="social-chip">[ LINKEDIN ]</span>
-              <span class="social-chip">[ GITHUB ]</span>
+
             </div>
           </div>
 
@@ -382,10 +382,9 @@
             </div>
             <h3 class="member-name">SAHIL DARGAR</h3>
             <span class="member-role">Vice President</span>
-            <p class="member-domain">Domain: Incubation & Operations</p>
+
             <div class="member-socials">
-              <span class="social-chip">[ LINKEDIN ]</span>
-              <span class="social-chip">[ GITHUB ]</span>
+
             </div>
           </div>
 
@@ -396,10 +395,9 @@
             </div>
             <h3 class="member-name">RUDRESH JOSHI</h3>
             <span class="member-role">Treasurer</span>
-            <p class="member-domain">Domain: Finance & Resource Allocation</p>
+
             <div class="member-socials">
-              <span class="social-chip">[ LINKEDIN ]</span>
-              <span class="social-chip">[ GITHUB ]</span>
+
             </div>
           </div>
         </div>

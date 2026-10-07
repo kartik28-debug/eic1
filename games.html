@@ -18,7 +18,7 @@
 <!-- ── AUTH GUARD (runs before page renders) ── -->
 <script>
   (async () => {
-    const API_BASE = 'http://localhost:5000';
+    const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173' ? 'http://localhost:5000' : '';
     try {
       const res = await fetch(`${API_BASE}/api/auth/me`, {
         credentials: 'include'
@@ -135,7 +135,7 @@
   <script>
     // ── Post-load auth UI setup ──
     (function () {
-      const API_BASE = 'http://localhost:5000';
+      const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173' ? 'http://localhost:5000' : '';
 
       // Show student name in navbar once loaded
       if (window._eicStudent) {

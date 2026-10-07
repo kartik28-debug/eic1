@@ -20,6 +20,230 @@ function setupMarketMayhem(app, io, pool) {
   // In-memory active timer state for active games
   const activeTimers = {}; // { gameId: { intervalId, remainingSeconds, isPaused } }
 
+  // Auto-seed Round 3 events for existing games that have the 5 stocks if missing
+  async function ensureRound3Data(pool) {
+    try {
+      const gamesRes = await pool.query(`
+        SELECT DISTINCT g.id FROM games g
+        JOIN stocks s ON s.game_id = g.id
+        WHERE s.ticker IN ('RELY', 'ADHI', 'TATV', 'INFY-R', 'SMBR');
+      `);
+
+      for (const row of gamesRes.rows) {
+        const gameId = row.id;
+        const checkEv = await pool.query('SELECT COUNT(*) FROM round_events WHERE game_id = $1 AND round_number = 3;', [gameId]);
+        if (parseInt(checkEv.rows[0].count) === 0) {
+          const stocksRes = await pool.query('SELECT id, ticker FROM stocks WHERE game_id = $1;', [gameId]);
+          const stockMap = {};
+          stocksRes.rows.forEach(s => stockMap[s.ticker] = s.id);
+
+          const r3Events = [
+            { round: 3, ticker: 'RELY', block_deal_text: null, news_text: 'Festive-season retail sales stay strong across its stores.', true_price_change: 1.14, noise: 0.90 },
+            { round: 3, ticker: 'RELY', block_deal_text: null, news_text: 'Crude oil prices rise again, and the telecom tariff review is still pending.', true_price_change: 0.00, noise: 0.00 },
+            { round: 3, ticker: 'ADHI', block_deal_text: null, news_text: 'Approvals clear for a few delayed port and airport projects.', true_price_change: -3.09, noise: -1.40 },
+            { round: 3, ticker: 'ADHI', block_deal_text: null, news_text: 'High interest rates keep its debt costs heavy.', true_price_change: 0.00, noise: 0.00 },
+            { round: 3, ticker: 'TATV', block_deal_text: null, news_text: 'Festive vehicle bookings hit a seasonal peak.', true_price_change: 4.01, noise: 1.10 },
+            { round: 3, ticker: 'TATV', block_deal_text: null, news_text: 'Metal input costs keep easing, though supply of popular models is tight.', true_price_change: 0.00, noise: 0.00 },
+            { round: 3, ticker: 'INFY-R', block_deal_text: null, news_text: 'Several large client deals announced.', true_price_change: 1.09, noise: -0.60 },
+            { round: 3, ticker: 'INFY-R', block_deal_text: null, news_text: 'Global IT spending remains cautious.', true_price_change: 0.00, noise: 0.00 },
+            { round: 3, ticker: 'SMBR', block_deal_text: 'Block deal: Sell 0.7% stake in Sambar from Una.', news_text: 'Eating-out spending keeps rising in smaller cities.', true_price_change: 0.99, noise: 1.80 },
+            { round: 3, ticker: 'SMBR', block_deal_text: null, news_text: 'Shares have run up sharply, and food input costs edge up.', true_price_change: 0.00, noise: 0.00 }
+          ];
+
+          for (const ev of r3Events) {
+            if (stockMap[ev.ticker]) {
+              await pool.query(
+                'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+                [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+              );
+            }
+          }
+          console.log(`✅ Seeded Round 3 events for Game ID ${gameId}`);
+        }
+      }
+    } catch (e) {
+      console.error('Error ensuring Round 3 data:', e);
+    }
+  }
+  setTimeout(() => ensureRound3Data(pool), 1500);
+
+  // Auto-seed Round 4 events and host-only SMBR insider tip for existing games
+  async function ensureRound4Data(pool) {
+    try {
+      const gamesRes = await pool.query(`
+        SELECT DISTINCT g.id FROM games g
+        JOIN stocks s ON s.game_id = g.id
+        WHERE s.ticker IN ('RELY', 'ADHI', 'TATV', 'INFY-R', 'SMBR');
+      `);
+
+      for (const row of gamesRes.rows) {
+        const gameId = row.id;
+        const checkEv = await pool.query('SELECT COUNT(*) FROM round_events WHERE game_id = $1 AND round_number = 4;', [gameId]);
+        if (parseInt(checkEv.rows[0].count) === 0) {
+          const stocksRes = await pool.query('SELECT id, ticker FROM stocks WHERE game_id = $1;', [gameId]);
+          const stockMap = {};
+          stocksRes.rows.forEach(s => stockMap[s.ticker] = s.id);
+
+          const r4Events = [
+            // RELY: +1.96% (÷4: +1.26%, noise: +0.70%) → ₹2,836.85 → ₹2,892.45
+            { round: 4, ticker: 'RELY', block_deal_text: null, news_text: "Festive sales keep Relyant's retail stores busy.", true_price_change: 1.26, noise: 0.70 },
+            { round: 4, ticker: 'RELY', block_deal_text: null, news_text: "Telecom tariff review ends with a modest hike, smaller than the market hoped.", true_price_change: 0.00, noise: 0.00 },
+            // ADHI: -4.05% (÷4: -2.85%, noise: -1.20%) → ₹1,866.75 → ₹1,791.15
+            { round: 4, ticker: 'ADHI', block_deal_text: null, news_text: "The central bank hints at a rate pause, offering some relief to debt-heavy infrastructure firms.", true_price_change: -2.85, noise: -1.20 },
+            { round: 4, ticker: 'ADHI', block_deal_text: null, news_text: "Project approvals stay slow, and Adhira's high debt remains a worry.", true_price_change: 0.00, noise: 0.00 },
+            // TATV: +2.85% (÷4: +3.65%, noise: -0.80%) → ₹1,191.18 → ₹1,225.13
+            { round: 4, ticker: 'TATV', block_deal_text: null, news_text: "Tatva announces a new model launch for next quarter.", true_price_change: 3.65, noise: -0.80 },
+            { round: 4, ticker: 'TATV', block_deal_text: null, news_text: "Festive bookings stay strong as metal prices keep easing.", true_price_change: 0.00, noise: 0.00 },
+            // INFY-R: +2.46% (÷4: +1.16%, noise: +1.30%) → ₹1,641.80 → ₹1,682.19
+            { round: 4, ticker: 'INFY-R', block_deal_text: null, news_text: "Deal pipeline looks steadier, with a few mid-sized client wins.", true_price_change: 1.16, noise: 1.30 },
+            { round: 4, ticker: 'INFY-R', block_deal_text: null, news_text: "Clients are still cautious on tech budgets, so growth looks slow.", true_price_change: 0.00, noise: 0.00 },
+            // SMBR: -10.00% (÷4: +3.04%, insider: -15%, noise: +1.96% -> move: -10.00%) → ₹477.32 → ₹429.59
+            { round: 4, ticker: 'SMBR', block_deal_text: null, news_text: "Festive footfall is strong, and sales beat expectations at its outlets.", true_price_change: -11.96, noise: 1.96 },
+            { round: 4, ticker: 'SMBR', block_deal_text: null, news_text: "The company announces new outlets in smaller cities.", true_price_change: 0.00, noise: 0.00 }
+          ];
+
+          for (const ev of r4Events) {
+            if (stockMap[ev.ticker]) {
+              await pool.query(
+                'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+                [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+              );
+            }
+          }
+          console.log(`✅ Seeded Round 4 events for Game ID ${gameId}`);
+        }
+
+        // Check Round 4 SMBR super tip (Host-only, true tip, effect: -15.00)
+        const checkTip = await pool.query('SELECT COUNT(*) FROM tips WHERE game_id = $1 AND round_number = 4;', [gameId]);
+        if (parseInt(checkTip.rows[0].count) === 0) {
+          const stocksRes = await pool.query('SELECT id, ticker FROM stocks WHERE game_id = $1;', [gameId]);
+          const stockMap = {};
+          stocksRes.rows.forEach(s => stockMap[s.ticker] = s.id);
+
+          if (stockMap['SMBR']) {
+            await pool.query(
+              'INSERT INTO tips (game_id, round_number, stock_id, text, source_label, price, is_super_tip, is_true, effect_size, is_flagged) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);',
+              [
+                gameId,
+                4,
+                stockMap['SMBR'],
+                "SMBR's auditors have raised concerns about its accounts, and the promoter group is quietly selling shares. Expect a sharp fall.",
+                'Auditor',
+                0,
+                true,
+                true,
+                -15.00,
+                false
+              ]
+            );
+            console.log(`✅ Seeded Round 4 SMBR super tip for Game ID ${gameId}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error ensuring Round 4 data:', e);
+    }
+  }
+  setTimeout(() => ensureRound4Data(pool), 2000);
+
+  // Auto-seed Round 5 events and host-only insider tips for existing games
+  async function ensureRound5Data(pool) {
+    try {
+      const gamesRes = await pool.query(`
+        SELECT DISTINCT g.id FROM games g
+        JOIN stocks s ON s.game_id = g.id
+        WHERE s.ticker IN ('RELY', 'ADHI', 'TATV', 'INFY-R', 'SMBR');
+      `);
+
+      for (const row of gamesRes.rows) {
+        const gameId = row.id;
+        const checkEv = await pool.query('SELECT COUNT(*) FROM round_events WHERE game_id = $1 AND round_number = 5;', [gameId]);
+        if (parseInt(checkEv.rows[0].count) === 0) {
+          const stocksRes = await pool.query('SELECT id, ticker FROM stocks WHERE game_id = $1;', [gameId]);
+          const stockMap = {};
+          stocksRes.rows.forEach(s => stockMap[s.ticker] = s.id);
+
+          const r5Events = [
+            // RELY: -4.74% (÷4: +1.76%, insider: -7%, noise: +0.50% -> net: -4.74%) → ₹2,892.45 → ₹2,755.35
+            { round: 5, ticker: 'RELY', block_deal_text: null, news_text: "Relyant's retail stores report record festive sales, with strong demand for electronics and groceries.", true_price_change: -5.24, noise: 0.50 },
+            { round: 5, ticker: 'RELY', block_deal_text: null, news_text: "The government opens bidding for large infrastructure and telecom projects, and Relyant is expected to take part.", true_price_change: 0.00, noise: 0.00 },
+            // ADHI: -6.52% (÷4: -4.02%, insider: -3%, noise: +0.50% -> net: -6.52%) → ₹1,791.15 → ₹1,674.37
+            { round: 5, ticker: 'ADHI', block_deal_text: 'Block deal: Sell 1.0% stake in Adhira Ports & Infra.', news_text: "Some foreign funds trim their holdings in infrastructure stocks, including Adhira, citing high interest rates.", true_price_change: -7.02, noise: 0.50 },
+            { round: 5, ticker: 'ADHI', block_deal_text: null, news_text: "Several port and airport approvals remain stuck, and Adhira's high debt keeps analysts cautious.", true_price_change: 0.00, noise: 0.00 },
+            // TATV: +6.98% (÷4: +4.48%, insider: +3%, noise: -0.50% -> net: +6.98%) → ₹1,225.13 → ₹1,310.64
+            { round: 5, ticker: 'TATV', block_deal_text: 'Block deal: Buy 0.6% stake in Tatva Motors.', news_text: "Tatva's festive-season sales hit a record, with waiting periods on popular models stretching to several weeks.", true_price_change: 7.48, noise: -0.50 },
+            { round: 5, ticker: 'TATV', block_deal_text: null, news_text: "Reports say the government is studying support for electric vehicles, which could help Tatva's upcoming models.", true_price_change: 0.00, noise: 0.00 },
+            // INFY-R: +5.07% (÷4: +1.37%, insider: +4%, noise: -0.30% -> net: +5.07%) → ₹1,682.19 → ₹1,767.48
+            { round: 5, ticker: 'INFY-R', block_deal_text: null, news_text: "Infyra signs a few mid-sized deals with overseas clients as tech budgets slowly open up.", true_price_change: 5.37, noise: -0.30 },
+            { round: 5, ticker: 'INFY-R', block_deal_text: null, news_text: "The weaker rupee gives a small boost to Infyra's earnings, though client caution remains.", true_price_change: 0.00, noise: 0.00 },
+            // SMBR: +0.10% (÷4: -0.16%, insider: 0%, noise: +0.26% -> net: +0.10%) → ₹429.59 → ₹430.02
+            { round: 5, ticker: 'SMBR', block_deal_text: 'Block deal: Sell 1.5% stake in Sambar from Una.', news_text: "After last month's sharp fall, Sambar from Una says business is normal and outlets remain busy.", true_price_change: -0.16, noise: 0.26 },
+            { round: 5, ticker: 'SMBR', block_deal_text: null, news_text: "Some investors ask for clearer accounts, so the stock stays under watch.", true_price_change: 0.00, noise: 0.00 }
+          ];
+
+          for (const ev of r5Events) {
+            if (stockMap[ev.ticker]) {
+              await pool.query(
+                'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+                [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+              );
+            }
+          }
+          console.log(`✅ Seeded Round 5 events for Game ID ${gameId}`);
+        }
+
+        // Check Round 5 Insider Tips (Host-only, 5 tips)
+        const checkTips = await pool.query('SELECT COUNT(*) FROM tips WHERE game_id = $1 AND round_number = 5;', [gameId]);
+        if (parseInt(checkTips.rows[0].count) === 0) {
+          const stocksRes = await pool.query('SELECT id, ticker FROM stocks WHERE game_id = $1;', [gameId]);
+          const stockMap = {};
+          stocksRes.rows.forEach(s => stockMap[s.ticker] = s.id);
+
+          const r5Tips = [
+            {
+              ticker: 'RELY', source: 'Political Contact', price: 0, isSuper: true,
+              isTrue: false, effect: -7.00, isFlagged: false,
+              text: "Netaji Sahab was seen having chai with Mota Seth in a Delhi dhaba. A mega government contract for Relyant is signed, and the shares will zoom!"
+            },
+            {
+              ticker: 'ADHI', source: 'Research Analyst', price: 0, isSuper: true,
+              isTrue: true, effect: -3.00, isFlagged: false,
+              text: "Hindenbird Research is about to drop a 400-page report on Adhira. Their analyst has already sold his own flat to short the stock."
+            },
+            {
+              ticker: 'TATV', source: 'Government Source', price: 0, isSuper: true,
+              isTrue: true, effect: 3.00, isFlagged: false,
+              text: "A minister's cousin says the electric-vehicle subsidy is coming, and he has already ordered 3 Tatva cars to be safe."
+            },
+            {
+              ticker: 'INFY-R', source: 'Corporate Insider', price: 0, isSuper: true,
+              isTrue: true, effect: 4.00, isFlagged: false,
+              text: "Infyra's biggest US client is quietly renewing its mega contract. The CEO was caught celebrating with extra filter coffee."
+            },
+            {
+              ticker: 'SMBR', source: 'Food Critic', price: 0, isSuper: true,
+              isTrue: false, effect: 0.00, isFlagged: false,
+              text: "A famous food influencer tasted the sambar and made a face on camera. The shares will crash by Monday!"
+            }
+          ];
+
+          for (const t of r5Tips) {
+            if (stockMap[t.ticker]) {
+              await pool.query(
+                'INSERT INTO tips (game_id, round_number, stock_id, text, source_label, price, is_super_tip, is_true, effect_size, is_flagged) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);',
+                [gameId, 5, stockMap[t.ticker], t.text, t.source, t.price, t.isSuper, t.isTrue, t.effect, t.isFlagged]
+              );
+            }
+          }
+          console.log(`✅ Seeded Round 5 insider tips for Game ID ${gameId}`);
+        }
+      }
+    } catch (e) {
+      console.error('Error ensuring Round 5 data:', e);
+    }
+  }
+  setTimeout(() => ensureRound5Data(pool), 2500);
+
   // ─── Helper Functions ───
 
   // Get the current active (non-ENDED) game — used for live game actions
@@ -48,15 +272,24 @@ function setupMarketMayhem(app, io, pool) {
     }
   }
 
-  // Get prices for a specific round (falls back to round 0 if current round price not yet revealed)
+  // Get prices for a specific round (accurately carries forward previous round closing price)
   async function getStockPrices(gameId, roundNumber) {
     const query = `
       SELECT DISTINCT ON (s.id) 
         s.id, s.name, s.ticker, s.sector, s.description, s.volatility,
-        COALESCE(p.price, p0.price, 100.00) as current_price,
-        p0.price as initial_price
+        COALESCE(p_latest.price, p0.price, 100.00) as current_price,
+        COALESCE(p_prev.price, p0.price, 100.00) as initial_price
       FROM stocks s
-      LEFT JOIN stock_prices p ON p.stock_id = s.id AND p.game_id = s.game_id AND p.round_number = $2
+      LEFT JOIN LATERAL (
+        SELECT price FROM stock_prices
+        WHERE stock_id = s.id AND game_id = s.game_id AND round_number <= $2
+        ORDER BY round_number DESC LIMIT 1
+      ) p_latest ON true
+      LEFT JOIN LATERAL (
+        SELECT price FROM stock_prices
+        WHERE stock_id = s.id AND game_id = s.game_id AND round_number < $2
+        ORDER BY round_number DESC LIMIT 1
+      ) p_prev ON true
       LEFT JOIN stock_prices p0 ON p0.stock_id = s.id AND p0.game_id = s.game_id AND p0.round_number = 0
       WHERE s.game_id = $1
       ORDER BY s.id;
@@ -209,13 +442,49 @@ function setupMarketMayhem(app, io, pool) {
   });
 
   // ─── Internal: Seed a new game with default stocks, events, and tips ───
+  // ── ROUND 1 CONFIGURATION ──────────────────────────────────────────────────
+  // All price engine values (true_price_change, noise) are HOST/ENGINE ONLY.
+  // They are stored in round_events but NEVER sent to the player-facing API.
+  // noise is set to 0.00 for Round 1 so the engine produces exact final prices.
+  // ─────────────────────────────────────────────────────────────────────────────
   async function seedNewGame(client, gameId) {
+    // ── Round 1 stocks ──
     const stocksData = [
-      { name: 'Nexora Bank', ticker: 'NXB', sector: 'Banking', description: 'Digital-first banking platform serving tech startups, MSMEs, and young professionals across India.', volatility: 'Medium', initialPrice: 1200.00, historical: [1050.00, 1100.00, 1140.00, 1120.00, 1180.00, 1200.00] },
-      { name: 'ByteForge Systems', ticker: 'BFS', sector: 'IT', description: 'Enterprise cloud infrastructure provider and AI-driven workflow optimization software developer.', volatility: 'High', initialPrice: 850.00, historical: [720.00, 780.00, 810.00, 790.00, 830.00, 850.00] },
-      { name: 'Helixora Pharma', ticker: 'HXP', sector: 'Pharma', description: 'Specialty biopharmaceutical company manufacturing generic vaccines and targeted oncology treatments.', volatility: 'Medium', initialPrice: 540.00, historical: [490.00, 510.00, 500.00, 530.00, 525.00, 540.00] },
-      { name: 'Voltaris Energy', ticker: 'VTE', sector: 'Energy', description: 'Next-generation renewable energy enterprise building solar micro-grids and industrial battery storage.', volatility: 'High', initialPrice: 1650.00, historical: [1400.00, 1480.00, 1550.00, 1510.00, 1600.00, 1650.00] },
-      { name: 'MotoraX Mobility', ticker: 'MAX', sector: 'Auto', description: 'Commercial EV vehicle manufacturer pioneering electric urban transit buses and fleet delivery vans.', volatility: 'Low', initialPrice: 320.00, historical: [300.00, 305.00, 310.00, 312.00, 318.00, 320.00] }
+      {
+        name: 'Relyant Industries', ticker: 'RELY',
+        sector: 'Energy, Retail, Telecom',
+        description: 'Diversified conglomerate spanning energy distribution, organised retail, and telecom infrastructure across India.',
+        volatility: 'Medium', initialPrice: 2880.00,
+        historical: [2650.00, 2700.00, 2740.00, 2780.00, 2820.00, 2880.00]
+      },
+      {
+        name: 'Adhira Ports & Infra', ticker: 'ADHI',
+        sector: 'Ports, Airports, Power',
+        description: 'Major infrastructure developer operating ports, airports, and power transmission projects across coastal India.',
+        volatility: 'Medium', initialPrice: 2350.00,
+        historical: [2100.00, 2150.00, 2200.00, 2250.00, 2300.00, 2350.00]
+      },
+      {
+        name: 'Tatva Motors', ticker: 'TATV',
+        sector: 'Automobiles',
+        description: 'Passenger and commercial vehicle manufacturer known for its festive-season launches and growing EV portfolio.',
+        volatility: 'Medium', initialPrice: 960.00,
+        historical: [850.00, 870.00, 900.00, 920.00, 940.00, 960.00]
+      },
+      {
+        name: 'Infyra Technologies', ticker: 'INFY-R',
+        sector: 'IT Services',
+        description: 'Mid-cap IT services firm specialising in cloud migration, enterprise software, and digital transformation contracts.',
+        volatility: 'Low', initialPrice: 1540.00,
+        historical: [1420.00, 1450.00, 1480.00, 1500.00, 1520.00, 1540.00]
+      },
+      {
+        name: 'Sambar from Una', ticker: 'SMBR',
+        sector: 'Food Services',
+        description: 'Fast-growing regional food-service chain known for authentic South Indian cuisine, rapidly expanding into tier-2 cities.',
+        volatility: 'High', initialPrice: 410.00,
+        historical: [340.00, 355.00, 370.00, 385.00, 395.00, 410.00]
+      }
     ];
 
     const stockMap = {};
@@ -226,38 +495,92 @@ function setupMarketMayhem(app, io, pool) {
       );
       const stockId = r.rows[0].id;
       stockMap[s.ticker] = stockId;
+      // Round 0 = reference/starting price shown to students
       await client.query('INSERT INTO stock_prices (game_id, stock_id, round_number, price) VALUES ($1,$2,0,$3);', [gameId, stockId, s.initialPrice]);
+      // Historical prices (rounds -5 to -1) — used for chart display only
       for (let idx = 0; idx < s.historical.length; idx++) {
-        await client.query('INSERT INTO stock_prices (game_id, stock_id, round_number, price) VALUES ($1,$2,$3,$4);', [gameId, stockId, -6 + idx, s.historical[idx]]);
+        await client.query('INSERT INTO stock_prices (game_id, stock_id, round_number, price) VALUES ($1,$2,$3,$4);', [gameId, stockId, -5 + idx, s.historical[idx]]);
       }
     }
 
+    // ── Round 1 news events ──
+    // Each stock has 2 news items (block_deal_text = null for all Round 1 stocks).
+    // true_price_change is the EXACT final movement % for Round 1 (HOST/ENGINE ONLY).
+    // noise is 0.00 so executePriceEngine produces deterministic, exact final prices.
+    // Combined for each stock:
+    //   RELY: -2.75%  → ₹2,880.00 → ₹2,800.80
+    //   ADHI: -11.00% → ₹2,350.00 → ₹2,091.50
+    //   TATV: +11.00% → ₹960.00   → ₹1,065.60
+    //   INFY-R: +3.00%→ ₹1,540.00 → ₹1,586.20
+    //   SMBR: +13.50% → ₹410.00   → ₹465.35
+    //
+    // SECURITY: true_price_change and noise are NEVER included in player API responses.
+    // The round_events query in the player state endpoint selects only:
+    //   round_number, stock_id, ticker, stock_name, block_deal_text, news_text
+    //
+    // For Round 1, the price engine uses stock-level aggregated true_price_change.
+    // We store 2 events per stock — both with noise=0 and true_price_change split
+    // so their SUM equals the required final movement.
+    // Engine processes one row per stock_id per round; if two rows exist for the
+    // same stock in the same round, only the first is used. Therefore we consolidate
+    // to ONE row per stock carrying the full final movement percentage.
+    // The second news item is stored with true_price_change=0 and noise=0 (display only).
     const roundEventsData = [
-      { round: 1, ticker: 'NXB', block_deal_text: 'Domestic institutional investor acquires 2,50,000 equity shares of Nexora Bank.', news_text: 'Nexora Bank records 24% YoY surge in digital transaction volume and net interest margin growth.', true_price_change: 12.0, noise: 1.5 },
-      { round: 1, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems secures multi-year cloud management contract with a global logistics hub.', true_price_change: 5.0, noise: 0.8 },
-      { round: 1, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma announces successful Phase 1 safety trials for new oncology formulation.', true_price_change: 2.0, noise: 0.5 },
-      { round: 1, ticker: 'VTE', block_deal_text: null, news_text: 'Global crude price drop temporarily dampens renewable energy market sentiment.', true_price_change: -4.0, noise: 1.0 },
-      { round: 1, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility delivers 100 electric buses to state transport corporation.', true_price_change: 1.0, noise: 0.2 },
-      { round: 2, ticker: 'BFS', block_deal_text: null, news_text: 'Global microchip shortage causes 3-week delay in ByteForge enterprise server deployments.', true_price_change: -15.0, noise: -1.2 },
-      { round: 2, ticker: 'VTE', block_deal_text: 'Surprise block trade executed in Voltaris Energy by green energy venture capital firm.', news_text: 'Voltaris Energy unveils groundbreaking 50MW battery storage facility.', true_price_change: 18.0, noise: 2.0 },
-      { round: 2, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma reports steady Q2 generic drug sales in overseas export markets.', true_price_change: 6.0, noise: -0.5 },
-      { round: 2, ticker: 'NXB', block_deal_text: null, news_text: 'Nexora Bank increases deposit rates by 25 bps to attract retail fixed deposits.', true_price_change: -3.0, noise: 0.4 },
-      { round: 2, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility maintains stable electric vehicle production targets.', true_price_change: 0.0, noise: 0.1 },
-      { round: 3, ticker: 'HXP', block_deal_text: 'Bulk purchase of 5,00,000 shares of Helixora Pharma by international healthcare fund.', news_text: 'Helixora Pharma receives WHO fast-track authorization for mass vaccine deployment.', true_price_change: 22.0, noise: 1.0 },
-      { round: 3, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems resolves chip supply bottlenecks and resumes normal software integration.', true_price_change: 10.0, noise: 0.6 },
-      { round: 3, ticker: 'NXB', block_deal_text: null, news_text: 'Nexora Bank launches instant AI micro-loan app for small businesses.', true_price_change: 4.0, noise: -0.2 },
-      { round: 3, ticker: 'VTE', block_deal_text: null, news_text: 'Voltaris Energy faces short-term profit booking after recent price rally.', true_price_change: -8.0, noise: -1.0 },
-      { round: 3, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility expands EV charging network across 12 smart cities.', true_price_change: 3.0, noise: 0.3 },
-      { round: 4, ticker: 'VTE', block_deal_text: null, news_text: 'Voltaris Energy wins ₹4,500 Crore mega solar grid EPC contract from central power grid.', true_price_change: 24.0, noise: 1.0 },
-      { round: 4, ticker: 'MAX', block_deal_text: 'Promoter group sells 4% stake in MotoraX Mobility via open market block deal.', news_text: 'MotoraX Mobility battery supplier reports temporary factory shutdown due to flooding.', true_price_change: -12.0, noise: -0.8 },
-      { round: 4, ticker: 'NXB', block_deal_text: null, news_text: 'Nexora Bank provisions additional reserves for unsecured credit card defaults.', true_price_change: -5.0, noise: 0.5 },
-      { round: 4, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems trades flat amid mixed analyst ratings.', true_price_change: -2.0, noise: 0.2 },
-      { round: 4, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma consolidates gains after previous vaccine approval spike.', true_price_change: -4.0, noise: -0.4 },
-      { round: 5, ticker: 'NXB', block_deal_text: 'Final round strategic equity investment in Nexora Bank by global fintech group.', news_text: 'Central Bank cuts repo rate by 50 bps; banking stock valuations skyrocket.', true_price_change: 18.0, noise: 1.2 },
-      { round: 5, ticker: 'BFS', block_deal_text: null, news_text: 'ByteForge Systems announces breakthrough Generative AI enterprise suite with high pre-orders.', true_price_change: 20.0, noise: 1.5 },
-      { round: 5, ticker: 'MAX', block_deal_text: null, news_text: 'MotoraX Mobility announces maiden dividend and commercial EV export deal to Southeast Asia.', true_price_change: 12.0, noise: 0.6 },
-      { round: 5, ticker: 'VTE', block_deal_text: null, news_text: 'Voltaris Energy reports stellar annual earnings exceeding street estimates.', true_price_change: 10.0, noise: 0.8 },
-      { round: 5, ticker: 'HXP', block_deal_text: null, news_text: 'Helixora Pharma posts solid quarterly revenue growth across all domestic formulations.', true_price_change: 8.0, noise: 0.4 }
+      // RELY — Relyant Industries  (Final: -2.75%, noise=0)
+      {
+        round: 1, ticker: 'RELY', block_deal_text: null,
+        news_text: "Relyant's retail arm reports its busiest month of store footfall this year, with festive-season stocking starting early.",
+        true_price_change: -2.75, noise: 0.00
+      },
+      {
+        round: 1, ticker: 'RELY', block_deal_text: null,
+        news_text: "Relyant's telecom unit says tariff talks with regulators have not started, so no pricing change is expected soon.",
+        true_price_change: 0.00, noise: 0.00  // Display-only; final move already encoded above
+      },
+      // ADHI — Adhira Ports & Infra  (Final: -11.00%, noise=0)
+      {
+        round: 1, ticker: 'ADHI', block_deal_text: null,
+        news_text: "Adhira's new port expansion is stuck waiting for approvals, and its financing costs keep rising as interest rates stay high.",
+        true_price_change: -11.00, noise: 0.00
+      },
+      {
+        round: 1, ticker: 'ADHI', block_deal_text: null,
+        news_text: 'Adhira signs a long-term cargo handling contract with a shipping line, adding steady port revenue over the coming years.',
+        true_price_change: 0.00, noise: 0.00  // Display-only
+      },
+      // TATV — Tatva Motors  (Final: +11.00%, noise=0)
+      {
+        round: 1, ticker: 'TATV', block_deal_text: null,
+        news_text: "Tatva's vehicle bookings are up sharply ahead of the festive season, and dealers report waiting lists on its top models.",
+        true_price_change: 11.00, noise: 0.00
+      },
+      {
+        round: 1, ticker: 'TATV', block_deal_text: null,
+        news_text: "Falling steel and aluminium prices are expected to improve Tatva's profit margins.",
+        true_price_change: 0.00, noise: 0.00  // Display-only
+      },
+      // INFY-R — Infyra Technologies  (Final: +3.00%, noise=0)
+      {
+        round: 1, ticker: 'INFY-R', block_deal_text: null,
+        news_text: 'Infyra wins a cloud migration contract from a large European retailer.',
+        true_price_change: 3.00, noise: 0.00
+      },
+      {
+        round: 1, ticker: 'INFY-R', block_deal_text: null,
+        news_text: 'Infyra says some clients are delaying new technology spending until next year.',
+        true_price_change: 0.00, noise: 0.00  // Display-only
+      },
+      // SMBR — Sambar from Una  (Final: +13.50%, noise=0)
+      {
+        round: 1, ticker: 'SMBR', block_deal_text: null,
+        news_text: 'Sambar from Una opens three new outlets in smaller cities, and early crowds are strong.',
+        true_price_change: 13.50, noise: 0.00
+      },
+      {
+        round: 1, ticker: 'SMBR', block_deal_text: null,
+        news_text: 'A food-industry survey says people are eating out more often in smaller cities, a market Sambar already serves.',
+        true_price_change: 0.00, noise: 0.00  // Display-only
+      }
     ];
     for (const ev of roundEventsData) {
       await client.query(
@@ -266,21 +589,493 @@ function setupMarketMayhem(app, io, pool) {
       );
     }
 
+    // ── Round 1 insider tips ──
+    // SECURITY: is_true, effect_size, is_flagged are HOST/ENGINE ONLY.
+    // The player tip-shop API exposes ONLY: id, round_number, stock_id (NOT), source_label, price, is_super_tip.
+    // stock_id is intentionally NOT sent to players before purchase.
+    // After purchase, text is revealed but stock mapping, direction, and effect are NOT.
     const tipsData = [
-      { round: 1, ticker: 'NXB', source: 'Market Clerk', price: 3000, isSuper: false, isTrue: true, effect: 12.0, isFlagged: false, text: 'Unusual cash and digital deposit inflows observed at Nexora Bank urban branches this week.' },
-      { round: 1, ticker: 'BFS', source: 'Junior Analyst', price: 4000, isSuper: false, isTrue: true, effect: 5.0, isFlagged: false, text: 'ByteForge Systems expected to comfortably meet Q1 cloud licensing targets.' },
-      { round: 1, ticker: 'VTE', source: 'Industry Insider', price: 5500, isSuper: false, isTrue: false, effect: -4.0, isFlagged: false, text: 'Rumor: Voltaris Energy facing severe lithium cell procurement bottlenecks this quarter.' },
-      { round: 2, ticker: 'BFS', source: 'Research Assistant', price: 6000, isSuper: false, isTrue: true, effect: -15.0, isFlagged: true, text: 'Leaked memo indicates microchip delivery failure halting ByteForge enterprise server production lines.' },
-      { round: 2, ticker: 'VTE', source: 'Supplier', price: 7500, isSuper: false, isTrue: true, effect: 18.0, isFlagged: false, text: 'Voltaris battery deliveries to industrial grid projects up 40% over scheduled estimates.' },
-      { round: 2, ticker: 'HXP', source: 'Board Member', price: 8000, isSuper: false, isTrue: false, effect: 6.0, isFlagged: false, text: 'Internal memo claims Helixora clinical trials hit unexpected regulatory delays.' },
-      { round: 3, ticker: 'HXP', source: 'Industry Insider', price: 12000, isSuper: true, isTrue: true, effect: 22.0, isFlagged: true, text: 'SUPER TIP: World Health Organization approval letter for Helixora vaccine fast-track signed yesterday!' },
-      { round: 3, ticker: 'NXB', source: 'Market Clerk', price: 3500, isSuper: false, isTrue: true, effect: 4.0, isFlagged: false, text: 'Steady loan disbursement numbers noted across Nexora Bank SME business centers.' },
-      { round: 4, ticker: 'VTE', source: 'Research Assistant', price: 9000, isSuper: false, isTrue: true, effect: 24.0, isFlagged: true, text: 'Voltaris Energy selected as L1 highest bidder for government solar microgrid scheme.' },
-      { round: 4, ticker: 'MAX', source: 'Junior Analyst', price: 4500, isSuper: false, isTrue: true, effect: -12.0, isFlagged: false, text: 'MotoraX bus delivery schedule disrupted following flood damage at key battery assembly unit.' },
-      { round: 5, ticker: 'NXB', source: 'Board Member', price: 15000, isSuper: true, isTrue: true, effect: 18.0, isFlagged: false, text: 'SUPER TIP: Central Bank preparing emergency 50 bps interest rate cut to boost credit growth!' },
-      { round: 5, ticker: 'BFS', source: 'Supplier', price: 5000, isSuper: false, isTrue: false, effect: 20.0, isFlagged: false, text: 'ByteForge enterprise client renewals reported declining sharply in Q4.' }
+      {
+        round: 1, ticker: 'SMBR',
+        source: 'Board Member', price: 3000, isSuper: false,
+        isTrue: true, effect: 11.0, isFlagged: false,
+        text: 'Something big is coming for Sambar. Sources say a major supplier tie-up is about to be announced.'
+      },
+      {
+        round: 1, ticker: 'ADHI',
+        source: 'Middle Manager', price: 1500, isSuper: false,
+        isTrue: true, effect: -5.0, isFlagged: false,
+        text: "Adhira's expansion trouble is worse than the public news suggests. Lenders are getting nervous."
+      },
+      {
+        round: 1, ticker: 'TATV',
+        source: 'Clerk', price: 500, isSuper: false,
+        isTrue: true, effect: 5.0, isFlagged: false,
+        text: "Tatva's order book is stronger than reported, and a large fleet order may be on the way."
+      },
+      {
+        round: 1, ticker: 'INFY-R',
+        source: 'Clerk', price: 500, isSuper: false,
+        isTrue: true, effect: 1.0, isFlagged: false,
+        text: 'Infyra may land a small extra contract this month. Not a huge deal, but positive.'
+      }
     ];
     for (const t of tipsData) {
+      await client.query(
+        'INSERT INTO tips (game_id, round_number, stock_id, text, source_label, price, is_super_tip, is_true, effect_size, is_flagged) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);',
+        [gameId, t.round, stockMap[t.ticker], t.text, t.source, t.price, t.isSuper, t.isTrue, t.effect, t.isFlagged]
+      );
+    }
+
+    // ── ROUND 2 DATA ──────────────────────────────────────────────────────────────
+    //
+    // Round 2 OPENS at Round 1 closing prices (computed by REVEAL and stored as
+    // stock_prices with round_number = 1). The price engine for Round 2 uses
+    //   prevPrice = stock_prices WHERE round_number < 2 ORDER BY round_number DESC
+    // which picks round 1 prices automatically — no manual override required.
+    //
+    // Round 2 EXACT final prices (all noise pre-computed; noise stored separately):
+    //   RELY   ₹2,800.80 → ₹2,780.14  (-0.7375%, noise=0.00)
+    //   ADHI   ₹2,091.50 → ₹1,954.51  (-6.55%,   noise=0.00)
+    //   TATV   ₹1,065.60 → ₹1,133.27  (+6.35%,   noise=0.00)
+    //   INFY-R ₹1,586.20 → ₹1,633.79  (+3.00%,   noise=0.00)
+    //   SMBR   ₹465.35   → ₹464.36    (-0.213%,  noise=0.00)
+    //
+    // SECURITY: true_price_change, noise are HOST/ENGINE ONLY — never sent to players.
+    // Block deal info (visible to students via block_deal_text):
+    //   ADHI: SELL 3.2%  |  TATV: BUY 2.4%  |  INFY-R: BUY 0.8%
+    //   RELY: none        |  SMBR: none
+    // ─────────────────────────────────────────────────────────────────────────────
+    const round2EventsData = [
+      // RELY — Final: -0.7375%, noise=0.00 → ₹2,800.80 → ₹2,780.14
+      {
+        round: 2, ticker: 'RELY', block_deal_text: null,
+        news_text: "Relyant's retail arm reports a pickup in sales as the festive season gets closer, with stores restocking early.",
+        true_price_change: -0.7375, noise: 0.00  // PRIMARY — carries full final move
+      },
+      {
+        round: 2, ticker: 'RELY', block_deal_text: null,
+        news_text: "Crude oil prices hold steady, keeping Relyant's energy margins stable, while a telecom tariff review is still pending.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // ADHI — Final: -6.55%, noise=0.00 → ₹2,091.50 → ₹1,954.51
+      {
+        round: 2, ticker: 'ADHI',
+        block_deal_text: 'Block deal: 3.2% stake in Adhira Ports & Infra sold via open market transaction.',
+        news_text: "Several Adhira port and airport projects are delayed, and higher interest rates are raising the cost of its debt.",
+        true_price_change: -6.55, noise: 0.00  // PRIMARY
+      },
+      {
+        round: 2, ticker: 'ADHI', block_deal_text: null,
+        news_text: "Analysts warn that Adhira's heavy debt is limiting its room to start new projects.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // TATV — Final: +6.35%, noise=0.00 → ₹1,065.60 → ₹1,133.27
+      {
+        round: 2, ticker: 'TATV',
+        block_deal_text: 'Block deal: Institutional investor acquires 2.4% stake in Tatva Motors.',
+        news_text: "Festive-season bookings at Tatva are strong, with dealers reporting longer waiting times on several models.",
+        true_price_change: 6.35, noise: 0.00  // PRIMARY
+      },
+      {
+        round: 2, ticker: 'TATV', block_deal_text: null,
+        news_text: "Easing metal prices lower Tatva's input costs, which should help its margins.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // INFY-R — Final: +3.00%, noise=0.00 → ₹1,586.20 → ₹1,633.79
+      {
+        round: 2, ticker: 'INFY-R',
+        block_deal_text: 'Block deal: 0.8% stake in Infyra Technologies acquired by institutional buyer.',
+        news_text: "Infyra's latest update shows slower new deal wins, with some clients pausing technology projects.",
+        true_price_change: 3.00, noise: 0.00  // PRIMARY
+      },
+      {
+        round: 2, ticker: 'INFY-R', block_deal_text: null,
+        news_text: "A weaker rupee gives Infyra's export earnings a small lift.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // SMBR — Final: -0.213%, noise=0.00 → ₹465.35 → ₹464.36
+      {
+        round: 2, ticker: 'SMBR', block_deal_text: null,
+        news_text: "Sambar from Una's festive menu launch draws bigger crowds than expected at its newer outlets.",
+        true_price_change: -0.213, noise: 0.00  // PRIMARY
+      },
+      {
+        round: 2, ticker: 'SMBR', block_deal_text: null,
+        news_text: 'Food costs stay stable, helping Sambar from Una keep its prices unchanged.',
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      }
+    ];
+    for (const ev of round2EventsData) {
+      await client.query(
+        'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+        [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+      );
+    }
+
+    // ── Round 2 insider tips ──
+    // Both tips are FALSE. Insider effect = 0 for both.
+    // SECURITY: is_true, effect_size, is_flagged, stock mapping are HOST/ENGINE ONLY.
+    // Player tip-shop sees ONLY: id, round_number, source_label, price, is_super_tip.
+    const round2TipsData = [
+      {
+        round: 2, ticker: 'ADHI',
+        source: 'Board Member', price: 3000, isSuper: false,
+        isTrue: false, effect: 0.0, isFlagged: false,
+        text: 'A large buyer is lining up to take a big stake in Adhira. Expect a jump.'
+      },
+      {
+        round: 2, ticker: 'SMBR',
+        source: 'Middle Manager', price: 1500, isSuper: false,
+        isTrue: false, effect: 0.0, isFlagged: false,
+        text: 'Sambar from Una is about to announce a big new partnership.'
+      }
+    ];
+    for (const t of round2TipsData) {
+      await client.query(
+        'INSERT INTO tips (game_id, round_number, stock_id, text, source_label, price, is_super_tip, is_true, effect_size, is_flagged) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);',
+        [gameId, t.round, stockMap[t.ticker], t.text, t.source, t.price, t.isSuper, t.isTrue, t.effect, t.isFlagged]
+      );
+    }
+
+    // ── ROUND 3 DATA ──────────────────────────────────────────────────────────────
+    //
+    // Round 3 OPENS at Round 2 closing prices (computed by REVEAL and stored as
+    // stock_prices with round_number = 2):
+    //   RELY   ₹2,780.14
+    //   ADHI   ₹1,954.51
+    //   TATV   ₹1,133.27
+    //   INFY-R ₹1,633.79
+    //   SMBR   ₹464.36
+    //
+    // Round 3 EXACT final prices & engine movements (from engine-result screenshot):
+    //   RELY   ₹2,780.14 → ₹2,836.85  (+2.04%: true_price_change = +1.14%, noise = +0.90%)
+    //   ADHI   ₹1,954.51 → ₹1,866.75  (-4.49%: true_price_change = -3.09%, noise = -1.40%)
+    //   TATV   ₹1,133.27 → ₹1,191.18  (+5.11%: true_price_change = +4.01%, noise = +1.10%)
+    //   INFY-R ₹1,633.79 → ₹1,641.80  (+0.49%: true_price_change = +1.09%, noise = -0.60%)
+    //   SMBR   ₹464.36   → ₹477.32    (+2.79%: true_price_change = +0.99%, noise = +1.80%)
+    //
+    // Insider effect for Round 3 = 0 for all five stocks.
+    //
+    // SECURITY: true_price_change, noise are HOST/ENGINE ONLY — never sent to players.
+    // Block deal info (visible to students via block_deal_text):
+    //   SMBR: Sell 0.7% stake (PDF page 9)
+    //   RELY, ADHI, TATV, INFY-R: None
+    //
+    // News for Round 3 (two per stock, exactly as shown in screenshot):
+    //   RELY:
+    //     News 1: "Festive-season retail sales stay strong across its stores."
+    //     News 2: "Crude oil prices rise again, and the telecom tariff review is still pending."
+    //   ADHI:
+    //     News 1: "Approvals clear for a few delayed port and airport projects."
+    //     News 2: "High interest rates keep its debt costs heavy."
+    //   TATV:
+    //     News 1: "Festive vehicle bookings hit a seasonal peak."
+    //     News 2: "Metal input costs keep easing, though supply of popular models is tight."
+    //   INFY-R:
+    //     News 1: "Several large client deals announced."
+    //     News 2: "Global IT spending remains cautious."
+    //   SMBR:
+    //     News 1: "Eating-out spending keeps rising in smaller cities."
+    //     News 2: "Shares have run up sharply, and food input costs edge up."
+    // ─────────────────────────────────────────────────────────────────────────────
+    const round3EventsData = [
+      // RELY — Final: +2.04% (÷4: +1.14%, noise: +0.90%) → ₹2,780.14 → ₹2,836.85
+      {
+        round: 3, ticker: 'RELY', block_deal_text: null,
+        news_text: 'Festive-season retail sales stay strong across its stores.',
+        true_price_change: 1.14, noise: 0.90  // PRIMARY
+      },
+      {
+        round: 3, ticker: 'RELY', block_deal_text: null,
+        news_text: 'Crude oil prices rise again, and the telecom tariff review is still pending.',
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // ADHI — Final: -4.49% (÷4: -3.09%, noise: -1.40%) → ₹1,954.51 → ₹1,866.75
+      {
+        round: 3, ticker: 'ADHI', block_deal_text: null,
+        news_text: 'Approvals clear for a few delayed port and airport projects.',
+        true_price_change: -3.09, noise: -1.40  // PRIMARY
+      },
+      {
+        round: 3, ticker: 'ADHI', block_deal_text: null,
+        news_text: 'High interest rates keep its debt costs heavy.',
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // TATV — Final: +5.11% (÷4: +4.01%, noise: +1.10%) → ₹1,133.27 → ₹1,191.18
+      {
+        round: 3, ticker: 'TATV', block_deal_text: null,
+        news_text: 'Festive vehicle bookings hit a seasonal peak.',
+        true_price_change: 4.01, noise: 1.10  // PRIMARY
+      },
+      {
+        round: 3, ticker: 'TATV', block_deal_text: null,
+        news_text: 'Metal input costs keep easing, though supply of popular models is tight.',
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // INFY-R — Final: +0.49% (÷4: +1.09%, noise: -0.60%) → ₹1,633.79 → ₹1,641.80
+      {
+        round: 3, ticker: 'INFY-R', block_deal_text: null,
+        news_text: 'Several large client deals announced.',
+        true_price_change: 1.09, noise: -0.60  // PRIMARY
+      },
+      {
+        round: 3, ticker: 'INFY-R', block_deal_text: null,
+        news_text: 'Global IT spending remains cautious.',
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // SMBR — Final: +2.79% (÷4: +0.99%, noise: +1.80%) → ₹464.36 → ₹477.32
+      {
+        round: 3, ticker: 'SMBR',
+        block_deal_text: 'Block deal: Sell 0.7% stake in Sambar from Una.',
+        news_text: 'Eating-out spending keeps rising in smaller cities.',
+        true_price_change: 0.99, noise: 1.80  // PRIMARY
+      },
+      {
+        round: 3, ticker: 'SMBR', block_deal_text: null,
+        news_text: 'Shares have run up sharply, and food input costs edge up.',
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      }
+    ];
+    for (const ev of round3EventsData) {
+      await client.query(
+        'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+        [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+      );
+    }
+
+    // ── ROUND 4 DATA ──────────────────────────────────────────────────────────────
+    //
+    // Round 4 OPENS at Round 3 closing prices (computed by REVEAL and stored as
+    // stock_prices with round_number = 3):
+    //   RELY   ₹2,836.85
+    //   ADHI   ₹1,866.75
+    //   TATV   ₹1,191.18
+    //   INFY-R ₹1,641.80
+    //   SMBR   ₹477.32
+    //
+    // Round 4 EXACT final prices & engine movements (from engine-result screenshot):
+    //   RELY   ₹2,836.85 → ₹2,892.45  (+1.96%: ÷4 = +1.26%, noise = +0.70%)
+    //   ADHI   ₹1,866.75 → ₹1,791.15  (-4.05%: ÷4 = -2.85%, noise = -1.20%)
+    //   TATV   ₹1,191.18 → ₹1,225.13  (+2.85%: ÷4 = +3.65%, noise = -0.80%)
+    //   INFY-R ₹1,641.80 → ₹1,682.19  (+2.46%: ÷4 = +1.16%, noise = +1.30%)
+    //   SMBR   ₹477.32   → ₹429.59    (-10.00%: ÷4 = +3.04%, insider = -15%, noise = +1.96% -> move = -10.00%)
+    //
+    // Host-only SMBR insider tip:
+    //   Tip: "SMBR's auditors have raised concerns about its accounts, and the promoter group is quietly selling shares. Expect a sharp fall."
+    //   Source: 'Auditor', is_true = true, effect_size = -15.00, is_super_tip = true, is_flagged = false, price = 0
+    //   Assigned via host super-tip assignment mechanism to selected teams only.
+    //
+    // SECURITY: true_price_change, noise, is_true, effect_size are HOST/ENGINE ONLY.
+    // Block deal info: None for all stocks (PDF pages 1, 3, 5, 7, 9)
+    // ─────────────────────────────────────────────────────────────────────────────
+    const round4EventsData = [
+      // RELY — Final: +1.96% (÷4: +1.26%, noise: +0.70%) → ₹2,836.85 → ₹2,892.45
+      {
+        round: 4, ticker: 'RELY', block_deal_text: null,
+        news_text: "Festive sales keep Relyant's retail stores busy.",
+        true_price_change: 1.26, noise: 0.70  // PRIMARY
+      },
+      {
+        round: 4, ticker: 'RELY', block_deal_text: null,
+        news_text: "Telecom tariff review ends with a modest hike, smaller than the market hoped.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // ADHI — Final: -4.05% (÷4: -2.85%, noise: -1.20%) → ₹1,866.75 → ₹1,791.15
+      {
+        round: 4, ticker: 'ADHI', block_deal_text: null,
+        news_text: "The central bank hints at a rate pause, offering some relief to debt-heavy infrastructure firms.",
+        true_price_change: -2.85, noise: -1.20  // PRIMARY
+      },
+      {
+        round: 4, ticker: 'ADHI', block_deal_text: null,
+        news_text: "Project approvals stay slow, and Adhira's high debt remains a worry.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // TATV — Final: +2.85% (÷4: +3.65%, noise: -0.80%) → ₹1,191.18 → ₹1,225.13
+      {
+        round: 4, ticker: 'TATV', block_deal_text: null,
+        news_text: "Tatva announces a new model launch for next quarter.",
+        true_price_change: 3.65, noise: -0.80  // PRIMARY
+      },
+      {
+        round: 4, ticker: 'TATV', block_deal_text: null,
+        news_text: "Festive bookings stay strong as metal prices keep easing.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // INFY-R — Final: +2.46% (÷4: +1.16%, noise: +1.30%) → ₹1,641.80 → ₹1,682.19
+      {
+        round: 4, ticker: 'INFY-R', block_deal_text: null,
+        news_text: "Deal pipeline looks steadier, with a few mid-sized client wins.",
+        true_price_change: 1.16, noise: 1.30  // PRIMARY
+      },
+      {
+        round: 4, ticker: 'INFY-R', block_deal_text: null,
+        news_text: "Clients are still cautious on tech budgets, so growth looks slow.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // SMBR — Final: -10.00% (÷4: +3.04%, insider: -15%, noise: +1.96% -> move: -10.00%) → ₹477.32 → ₹429.59
+      {
+        round: 4, ticker: 'SMBR', block_deal_text: null,
+        news_text: "Festive footfall is strong, and sales beat expectations at its outlets.",
+        true_price_change: -11.96, noise: 1.96  // PRIMARY (3.04 - 15 = -11.96, + 1.96 noise = -10.00%)
+      },
+      {
+        round: 4, ticker: 'SMBR', block_deal_text: null,
+        news_text: "The company announces new outlets in smaller cities.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      }
+    ];
+    for (const ev of round4EventsData) {
+      await client.query(
+        'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+        [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+      );
+    }
+
+    // ── Round 4 Insider Tip (Host-only SMBR super tip) ──
+    const round4TipsData = [
+      {
+        round: 4, ticker: 'SMBR',
+        source: 'Auditor', price: 0, isSuper: true,
+        isTrue: true, effect: -15.00, isFlagged: false,
+        text: "SMBR's auditors have raised concerns about its accounts, and the promoter group is quietly selling shares. Expect a sharp fall."
+      }
+    ];
+    for (const t of round4TipsData) {
+      await client.query(
+        'INSERT INTO tips (game_id, round_number, stock_id, text, source_label, price, is_super_tip, is_true, effect_size, is_flagged) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);',
+        [gameId, t.round, stockMap[t.ticker], t.text, t.source, t.price, t.isSuper, t.isTrue, t.effect, t.isFlagged]
+      );
+    }
+
+    // ── ROUND 5 DATA (FINAL ROUND) ────────────────────────────────────────────────
+    //
+    // Round 5 OPENS at Round 4 closing prices (computed by REVEAL and stored as
+    // stock_prices with round_number = 4):
+    //   RELY   ₹2,892.45
+    //   ADHI   ₹1,791.15
+    //   TATV   ₹1,225.13
+    //   INFY-R ₹1,682.19
+    //   SMBR   ₹429.59
+    //
+    // Round 5 EXACT final prices & engine movements (from engine-result screenshot):
+    //   RELY   ₹2,892.45 → ₹2,755.35  (-4.74%: ÷4 = +1.76%, insider = -7%, noise = +0.50% -> move = -4.74%)
+    //   ADHI   ₹1,791.15 → ₹1,674.37  (-6.52%: ÷4 = -4.02%, insider = -3%, noise = +0.50% -> move = -6.52%)
+    //   TATV   ₹1,225.13 → ₹1,310.64  (+6.98%: ÷4 = +4.48%, insider = +3%, noise = -0.50% -> move = +6.98%)
+    //   INFY-R ₹1,682.19 → ₹1,767.48  (+5.07%: ÷4 = +1.37%, insider = +4%, noise = -0.30% -> move = +5.07%)
+    //   SMBR   ₹429.59   → ₹430.02    (+0.10%: ÷4 = -0.16%, insider = 0%, noise = +0.26% -> move = +0.10%)
+    //
+    // Round 5 Insider Tips (Host-only, 5 tips with different truth/effects):
+    //   RELY: "Netaji Sahab was seen having chai...", is_true: false (trap), effect: -7.00
+    //   ADHI: "Hindenbird Research is about to drop...", is_true: true, effect: -3.00
+    //   TATV: "A minister's cousin says the electric-vehicle subsidy...", is_true: true, effect: 3.00
+    //   INFY-R: "Infyra's biggest US client is quietly renewing...", is_true: true, effect: 4.00
+    //   SMBR: "A famous food influencer tasted the sambar...", is_true: false, effect: 0.00
+    //
+    // SECURITY: true_price_change, noise, is_true, effect_size are HOST/ENGINE ONLY.
+    // Block deal info:
+    //   ADHI: Sell 1.0% stake
+    //   TATV: Buy 0.6% stake
+    //   SMBR: Sell 1.5% stake
+    //   RELY, INFY-R: None
+    // ─────────────────────────────────────────────────────────────────────────────
+    const round5EventsData = [
+      // RELY — Final: -4.74% (÷4: +1.76%, insider: -7%, noise: +0.50% -> net: -4.74%) → ₹2,892.45 → ₹2,755.35
+      {
+        round: 5, ticker: 'RELY', block_deal_text: null,
+        news_text: "Relyant's retail stores report record festive sales, with strong demand for electronics and groceries.",
+        true_price_change: -5.24, noise: 0.50  // PRIMARY
+      },
+      {
+        round: 5, ticker: 'RELY', block_deal_text: null,
+        news_text: "The government opens bidding for large infrastructure and telecom projects, and Relyant is expected to take part.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // ADHI — Final: -6.52% (÷4: -4.02%, insider: -3%, noise: +0.50% -> net: -6.52%) → ₹1,791.15 → ₹1,674.37
+      {
+        round: 5, ticker: 'ADHI',
+        block_deal_text: 'Block deal: Sell 1.0% stake in Adhira Ports & Infra.',
+        news_text: "Some foreign funds trim their holdings in infrastructure stocks, including Adhira, citing high interest rates.",
+        true_price_change: -7.02, noise: 0.50  // PRIMARY
+      },
+      {
+        round: 5, ticker: 'ADHI', block_deal_text: null,
+        news_text: "Several port and airport approvals remain stuck, and Adhira's high debt keeps analysts cautious.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // TATV — Final: +6.98% (÷4: +4.48%, insider: +3%, noise: -0.50% -> net: +6.98%) → ₹1,225.13 → ₹1,310.64
+      {
+        round: 5, ticker: 'TATV',
+        block_deal_text: 'Block deal: Buy 0.6% stake in Tatva Motors.',
+        news_text: "Tatva's festive-season sales hit a record, with waiting periods on popular models stretching to several weeks.",
+        true_price_change: 7.48, noise: -0.50  // PRIMARY
+      },
+      {
+        round: 5, ticker: 'TATV', block_deal_text: null,
+        news_text: "Reports say the government is studying support for electric vehicles, which could help Tatva's upcoming models.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // INFY-R — Final: +5.07% (÷4: +1.37%, insider: +4%, noise: -0.30% -> net: +5.07%) → ₹1,682.19 → ₹1,767.48
+      {
+        round: 5, ticker: 'INFY-R', block_deal_text: null,
+        news_text: "Infyra signs a few mid-sized deals with overseas clients as tech budgets slowly open up.",
+        true_price_change: 5.37, noise: -0.30  // PRIMARY
+      },
+      {
+        round: 5, ticker: 'INFY-R', block_deal_text: null,
+        news_text: "The weaker rupee gives a small boost to Infyra's earnings, though client caution remains.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      },
+      // SMBR — Final: +0.10% (÷4: -0.16%, insider: 0%, noise: +0.26% -> net: +0.10%) → ₹429.59 → ₹430.02
+      {
+        round: 5, ticker: 'SMBR',
+        block_deal_text: 'Block deal: Sell 1.5% stake in Sambar from Una.',
+        news_text: "After last month's sharp fall, Sambar from Una says business is normal and outlets remain busy.",
+        true_price_change: -0.16, noise: 0.26  // PRIMARY
+      },
+      {
+        round: 5, ticker: 'SMBR', block_deal_text: null,
+        news_text: "Some investors ask for clearer accounts, so the stock stays under watch.",
+        true_price_change: 0.00, noise: 0.00  // DISPLAY-ONLY
+      }
+    ];
+    for (const ev of round5EventsData) {
+      await client.query(
+        'INSERT INTO round_events (game_id, round_number, stock_id, block_deal_text, news_text, true_price_change, noise) VALUES ($1,$2,$3,$4,$5,$6,$7);',
+        [gameId, ev.round, stockMap[ev.ticker], ev.block_deal_text, ev.news_text, ev.true_price_change, ev.noise]
+      );
+    }
+
+    // ── Round 5 Insider Tips (Host-only, 5 tips) ──
+    const round5TipsData = [
+      {
+        round: 5, ticker: 'RELY', source: 'Political Contact', price: 0, isSuper: true,
+        isTrue: false, effect: -7.00, isFlagged: false,
+        text: "Netaji Sahab was seen having chai with Mota Seth in a Delhi dhaba. A mega government contract for Relyant is signed, and the shares will zoom!"
+      },
+      {
+        round: 5, ticker: 'ADHI', source: 'Research Analyst', price: 0, isSuper: true,
+        isTrue: true, effect: -3.00, isFlagged: false,
+        text: "Hindenbird Research is about to drop a 400-page report on Adhira. Their analyst has already sold his own flat to short the stock."
+      },
+      {
+        round: 5, ticker: 'TATV', source: 'Government Source', price: 0, isSuper: true,
+        isTrue: true, effect: 3.00, isFlagged: false,
+        text: "A minister's cousin says the electric-vehicle subsidy is coming, and he has already ordered 3 Tatva cars to be safe."
+      },
+      {
+        round: 5, ticker: 'INFY-R', source: 'Corporate Insider', price: 0, isSuper: true,
+        isTrue: true, effect: 4.00, isFlagged: false,
+        text: "Infyra's biggest US client is quietly renewing its mega contract. The CEO was caught celebrating with extra filter coffee."
+      },
+      {
+        round: 5, ticker: 'SMBR', source: 'Food Critic', price: 0, isSuper: true,
+        isTrue: false, effect: 0.00, isFlagged: false,
+        text: "A famous food influencer tasted the sambar and made a face on camera. The shares will crash by Monday!"
+      }
+    ];
+    for (const t of round5TipsData) {
       await client.query(
         'INSERT INTO tips (game_id, round_number, stock_id, text, source_label, price, is_super_tip, is_true, effect_size, is_flagged) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10);',
         [gameId, t.round, stockMap[t.ticker], t.text, t.source, t.price, t.isSuper, t.isTrue, t.effect, t.isFlagged]
@@ -346,7 +1141,8 @@ function setupMarketMayhem(app, io, pool) {
   // 2. GET /api/market-mayhem/fact-sheet
   app.get('/api/market-mayhem/fact-sheet', async (req, res) => {
     try {
-      const game = await getActiveGame();
+      let game = await getActiveGame();
+      if (!game) game = await getLatestEndedGame();
       if (!game) return res.status(404).json({ success: false, message: 'No game found' });
 
       const stocksRes = await pool.query(`
@@ -1042,13 +1838,14 @@ function setupMarketMayhem(app, io, pool) {
       `, [game.id, game.current_round]);
 
       // Available tips in Tip Shop for current round
-      // SECURITY: only return safe metadata — NEVER expose text, is_true, effect_size, is_flagged
+      // SECURITY: NEVER expose stock_id, stock_name, stock_ticker, text, is_true, effect_size, is_flagged to players.
+      // Per Round 1 spec: students may ONLY see source_label, price, is_super_tip BEFORE purchase.
+      // tip text is revealed AFTER purchase (handled by /api/market-mayhem/tips/buy response).
+      // stock mapping is NEVER revealed through the API.
       const availableTipsRes = await pool.query(`
-        SELECT t.id, t.round_number, t.stock_id, s.name as stock_name, s.ticker as stock_ticker,
-               t.source_label, t.price, t.is_super_tip
+        SELECT t.id, t.round_number, t.source_label, t.price, t.is_super_tip
         FROM tips t
-        JOIN stocks s ON s.id = t.stock_id
-        WHERE t.game_id = $1 AND t.round_number = $2;
+        WHERE t.game_id = $1 AND t.round_number = $2 AND (t.is_super_tip = FALSE OR t.is_super_tip IS NULL);
       `, [game.id, game.current_round]);
 
       // Leaderboard
@@ -1332,6 +2129,15 @@ function setupMarketMayhem(app, io, pool) {
         });
       }
 
+      // Security: super tips are host-assigned only and cannot be purchased in the Tip Shop
+      if (tip.is_super_tip) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({
+          success: false,
+          message: 'Classified super tips cannot be purchased in the Tip Shop.'
+        });
+      }
+
       const price = parseFloat(tip.price);
 
       if (cashBalance < price) {
@@ -1543,12 +2349,19 @@ function setupMarketMayhem(app, io, pool) {
         roundToSet = game.current_round; // keep current round
         isEndingGame = true;
       } else if (phaseToSet === 'NEXT_ROUND') {
-        if (roundToSet >= 5) {
+        // Rounds 1, 2, 3, 4, & 5 (FINAL) implementation: 5 rounds total.
+        // ALWAYS use game.current_round from the DB — never trust client-supplied newRound
+        // for the end-game decision, to prevent stale client state from triggering early end.
+        const dbCurrentRound = game.current_round;
+        if (dbCurrentRound >= 5) {
+          // Round 5 is done — end the game
           statusToSet = 'ENDED';
           phaseToSet = 'REVEAL';
+          roundToSet = dbCurrentRound;
           isEndingGame = true;
         } else {
-          roundToSet += 1;
+          // Advance to next round (Round 1 → 2, Round 2 → 3, Round 3 → 4, Round 4 → 5)
+          roundToSet = dbCurrentRound + 1;
           phaseToSet = 'TIP_SHOP';  // Every new round begins with TIP_SHOP
         }
       }
@@ -1766,8 +2579,19 @@ function setupMarketMayhem(app, io, pool) {
   });
 
   // Price Calculation Engine (Strictly enforces -25% <= price_change <= +25%)
+  // For Round 1: each stock has 2 round_event rows (one with the actual % change,
+  // one display-only with 0.00). The DISTINCT ON query picks the primary event row
+  // (the one with the largest absolute price change) per stock, ensuring the
+  // predetermined Round 1 final prices are applied exactly.
   async function executePriceEngine(gameId, roundNumber) {
-    const eventsRes = await pool.query('SELECT stock_id, true_price_change, noise FROM round_events WHERE game_id = $1 AND round_number = $2;', [gameId, roundNumber]);
+    // Use DISTINCT ON to pick one row per stock, preferring the row with the
+    // largest absolute true_price_change (i.e., the primary price-moving event).
+    const eventsRes = await pool.query(`
+      SELECT DISTINCT ON (stock_id) stock_id, true_price_change, noise
+      FROM round_events
+      WHERE game_id = $1 AND round_number = $2
+      ORDER BY stock_id, ABS(true_price_change) DESC, id ASC;
+    `, [gameId, roundNumber]);
     const prevPricesRes = await pool.query(`
       SELECT DISTINCT ON (stock_id) stock_id, price FROM stock_prices
       WHERE game_id = $1 AND round_number < $2 ORDER BY stock_id, round_number DESC;
@@ -2032,22 +2856,55 @@ function setupMarketMayhem(app, io, pool) {
         return res.status(400).json({ success: false, message: 'Game has ended. Super tip assignment disabled.' });
       }
 
-      // Find super tip for current round (scoped to this game)
-      const tipRes = await pool.query('SELECT * FROM tips WHERE game_id = $1 AND round_number = $2 AND is_super_tip = TRUE LIMIT 1;', [game.id, game.current_round]);
-      if (tipRes.rows.length === 0) {
-        return res.status(404).json({ success: false, message: `No super tip found for Round ${game.current_round}` });
-      }
-      const superTip = tipRes.rows[0];
-
       // Find all teams in game
       const teamsRes = await pool.query('SELECT id, team_name FROM teams WHERE game_id = $1;', [game.id]);
       if (teamsRes.rows.length === 0) {
         return res.status(400).json({ success: false, message: 'No teams registered in game.' });
       }
 
-      // Pick random team server-side
+      // Pick team (if teamId specified in body, use it, otherwise pick random team)
       const teams = teamsRes.rows;
-      const selectedTeam = teams[Math.floor(Math.random() * teams.length)];
+      const targetTeamId = req.body && req.body.teamId ? parseInt(req.body.teamId) : null;
+      let selectedTeam = targetTeamId ? teams.find(t => t.id === targetTeamId) : null;
+      if (!selectedTeam) {
+        selectedTeam = teams[Math.floor(Math.random() * teams.length)];
+      }
+
+      // Find super tip for current round:
+      // If tipId or ticker specified in req.body, use that;
+      // otherwise, pick a super tip that the selected team has not yet received (or random among all)
+      let tipRes;
+      if (req.body && req.body.tipId) {
+        tipRes = await pool.query(
+          'SELECT * FROM tips WHERE game_id = $1 AND round_number = $2 AND id = $3 AND is_super_tip = TRUE;',
+          [game.id, game.current_round, parseInt(req.body.tipId)]
+        );
+      } else if (req.body && req.body.ticker) {
+        tipRes = await pool.query(`
+          SELECT t.* FROM tips t
+          JOIN stocks s ON s.id = t.stock_id
+          WHERE t.game_id = $1 AND t.round_number = $2 AND s.ticker = $3 AND t.is_super_tip = TRUE LIMIT 1;
+        `, [game.id, game.current_round, req.body.ticker]);
+      } else {
+        tipRes = await pool.query(`
+          SELECT t.* FROM tips t
+          WHERE t.game_id = $1 AND t.round_number = $2 AND t.is_super_tip = TRUE
+            AND t.id NOT IN (SELECT tip_id FROM team_tips WHERE team_id = $3)
+          ORDER BY RANDOM() LIMIT 1;
+        `, [game.id, game.current_round, selectedTeam.id]);
+
+        if (tipRes.rows.length === 0) {
+          tipRes = await pool.query(
+            'SELECT * FROM tips WHERE game_id = $1 AND round_number = $2 AND is_super_tip = TRUE ORDER BY RANDOM() LIMIT 1;',
+            [game.id, game.current_round]
+          );
+        }
+      }
+
+      if (tipRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: `No super tip found for Round ${game.current_round}` });
+      }
+      const superTip = tipRes.rows[0];
 
       // Assign super tip (insert into team_tips)
       await pool.query(`
@@ -2059,6 +2916,7 @@ function setupMarketMayhem(app, io, pool) {
       // Stock details
       const stockRes = await pool.query('SELECT name, ticker FROM stocks WHERE id = $1;', [superTip.stock_id]);
       const stockName = stockRes.rows.length > 0 ? stockRes.rows[0].name : '';
+      const stockTicker = stockRes.rows.length > 0 ? stockRes.rows[0].ticker : '';
 
       // Notify ONLY the selected team socket
       io.to(`team_${selectedTeam.id}`).emit('super-tip-assigned', {
@@ -2069,6 +2927,7 @@ function setupMarketMayhem(app, io, pool) {
           tip_id: superTip.id,
           stock_id: superTip.stock_id,
           stock_name: stockName,
+          stock_ticker: stockTicker,
           text: superTip.text,
           source_label: superTip.source_label,
           price: 0,
@@ -2078,7 +2937,7 @@ function setupMarketMayhem(app, io, pool) {
 
       return res.json({
         success: true,
-        message: `Super Tip randomly assigned to ${selectedTeam.team_name}.`,
+        message: `Super Tip assigned to ${selectedTeam.team_name}.`,
         assignedTeam: selectedTeam.team_name
       });
 

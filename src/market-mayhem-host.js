@@ -6,7 +6,9 @@
 
 import { io } from 'socket.io-client';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port === '5173')
+  ? 'http://localhost:5000'
+  : '';
 let socket = null;
 let hostActiveGame = null;
 
@@ -111,7 +113,7 @@ function showHostDashboard() {
 
 function initHostSocket() {
   if (socket) return;
-  socket = io(API_BASE, { withCredentials: true });
+  socket = io(API_BASE || undefined, { withCredentials: true });
 
   socket.on('connect', () => {
     if (hostActiveGame) {

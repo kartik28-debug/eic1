@@ -1,7 +1,20 @@
 /**
- * Market Mayhem Seed Script
- * Seeds fictional stocks, historical prices, round events, and tips for a default game session.
+ * Market Mayhem Seed Script — Round 1 Configuration
+ * Seeds five Round 1 companies (RELY, ADHI, TATV, INFY-R, SMBR),
+ * 10 public news events, and 4 insider tips.
+ *
+ * SECURITY: true_price_change, noise, is_true, effect_size, is_flagged are
+ * HOST/ENGINE ONLY and are NEVER sent to the player-facing API.
+ *
+ * Price guarantees (noise=0.00 for all Round 1 events):
+ *   RELY   Rs2,880 -> Rs2,800.80  (-2.75%)
+ *   ADHI   Rs2,350 -> Rs2,091.50  (-11.00%)
+ *   TATV   Rs960   -> Rs1,065.60  (+11.00%)
+ *   INFY-R Rs1,540 -> Rs1,586.20  (+3.00%)
+ *   SMBR   Rs410   -> Rs465.35    (+13.50%)
+ *
  * Run via: npm run seed-market-mayhem
+ * Force-recreate: npm run seed-market-mayhem -- --force
  */
 
 const { Pool } = require('pg');
@@ -37,63 +50,53 @@ async function seedMarketMayhem(forceRecreation = false) {
       await client.query('DELETE FROM games WHERE id = $1;', [existingGame.rows[0].id]);
     }
 
-    // 1. Create Default Game
+    // 1. Create Default Game (Round 1 — sebi_check_round=1 since only 1 round)
     const gameRes = await client.query(`
       INSERT INTO games (
         name, status, starting_cash, max_team_size, round_timer_seconds, penalty_percentage, sebi_check_round, current_round, current_phase
       ) VALUES (
-        'Market Mayhem Season 1', 'LOBBY', 100000.00, 4, 120, 10.00, 4, 1, 'LOBBY'
+        'Market Mayhem Season 1', 'LOBBY', 100000.00, 4, 120, 10.00, 1, 1, 'LOBBY'
       ) RETURNING id;
     `);
     const gameId = gameRes.rows[0].id;
-    console.log(`🎮 Created Game ID: ${gameId}`);
+    console.log(`🎮 Created Game ID: ${gameId} — Round 1 configuration`);
 
-    // 2. Insert 5 Fictional Stocks
+    // 2. Insert 5 Round 1 Stocks
     const stocksData = [
       {
-        name: 'Nexora Bank',
-        ticker: 'NXB',
-        sector: 'Banking',
-        description: 'Digital-first banking platform serving tech startups, MSMEs, and young professionals across India.',
-        volatility: 'Medium',
-        initialPrice: 1200.00,
-        historical: [1050.00, 1100.00, 1140.00, 1120.00, 1180.00, 1200.00]
+        name: 'Relyant Industries', ticker: 'RELY',
+        sector: 'Energy, Retail, Telecom',
+        description: 'Diversified conglomerate spanning energy distribution, organised retail, and telecom infrastructure across India.',
+        volatility: 'Medium', initialPrice: 2880.00,
+        historical: [2650.00, 2700.00, 2740.00, 2780.00, 2820.00, 2880.00]
       },
       {
-        name: 'ByteForge Systems',
-        ticker: 'BFS',
-        sector: 'IT',
-        description: 'Enterprise cloud infrastructure provider and AI-driven workflow optimization software developer.',
-        volatility: 'High',
-        initialPrice: 850.00,
-        historical: [720.00, 780.00, 810.00, 790.00, 830.00, 850.00]
+        name: 'Adhira Ports & Infra', ticker: 'ADHI',
+        sector: 'Ports, Airports, Power',
+        description: 'Major infrastructure developer operating ports, airports, and power transmission projects across coastal India.',
+        volatility: 'Medium', initialPrice: 2350.00,
+        historical: [2100.00, 2150.00, 2200.00, 2250.00, 2300.00, 2350.00]
       },
       {
-        name: 'Helixora Pharma',
-        ticker: 'HXP',
-        sector: 'Pharma',
-        description: 'Specialty biopharmaceutical company manufacturing generic vaccines and targeted oncology treatments.',
-        volatility: 'Medium',
-        initialPrice: 540.00,
-        historical: [490.00, 510.00, 500.00, 530.00, 525.00, 540.00]
+        name: 'Tatva Motors', ticker: 'TATV',
+        sector: 'Automobiles',
+        description: 'Passenger and commercial vehicle manufacturer known for its festive-season launches and growing EV portfolio.',
+        volatility: 'Medium', initialPrice: 960.00,
+        historical: [850.00, 870.00, 900.00, 920.00, 940.00, 960.00]
       },
       {
-        name: 'Voltaris Energy',
-        ticker: 'VTE',
-        sector: 'Energy',
-        description: 'Next-generation renewable energy enterprise building solar micro-grids and industrial battery storage.',
-        volatility: 'High',
-        initialPrice: 1650.00,
-        historical: [1400.00, 1480.00, 1550.00, 1510.00, 1600.00, 1650.00]
+        name: 'Infyra Technologies', ticker: 'INFY-R',
+        sector: 'IT Services',
+        description: 'Mid-cap IT services firm specialising in cloud migration, enterprise software, and digital transformation contracts.',
+        volatility: 'Low', initialPrice: 1540.00,
+        historical: [1420.00, 1450.00, 1480.00, 1500.00, 1520.00, 1540.00]
       },
       {
-        name: 'MotoraX Mobility',
-        ticker: 'MAX',
-        sector: 'Auto',
-        description: 'Commercial EV vehicle manufacturer pioneering electric urban transit buses and fleet delivery vans.',
-        volatility: 'Low',
-        initialPrice: 320.00,
-        historical: [300.00, 305.00, 310.00, 312.00, 318.00, 320.00]
+        name: 'Sambar from Una', ticker: 'SMBR',
+        sector: 'Food Services',
+        description: 'Fast-growing regional food-service chain known for authentic South Indian cuisine, rapidly expanding into tier-2 cities.',
+        volatility: 'High', initialPrice: 410.00,
+        historical: [340.00, 355.00, 370.00, 385.00, 395.00, 410.00]
       }
     ];
 
@@ -108,233 +111,62 @@ async function seedMarketMayhem(forceRecreation = false) {
       const stockId = stockRes.rows[0].id;
       stockMap[s.ticker] = stockId;
 
-      // Insert round 0 current price
+      // Insert round 0 = reference/starting price shown to students
       await client.query(`
         INSERT INTO stock_prices (game_id, stock_id, round_number, price)
         VALUES ($1, $2, 0, $3);
       `, [gameId, stockId, s.initialPrice]);
 
-      // Insert 6-month historical prices (using negative round numbers -6 to -1 for reference if needed, or storing round 0)
+      // Insert historical prices (rounds -5 to -1) for chart display
       for (let idx = 0; idx < s.historical.length; idx++) {
         await client.query(`
           INSERT INTO stock_prices (game_id, stock_id, round_number, price)
           VALUES ($1, $2, $3, $4);
-        `, [gameId, stockId, -6 + idx, s.historical[idx]]);
+        `, [gameId, stockId, -5 + idx, s.historical[idx]]);
       }
     }
-    console.log('📈 5 Fictional Stocks & Historical Prices Seeded.');
+    console.log('📈 5 Round 1 Stocks & Historical Prices Seeded.');
 
-    // 3. Insert Round Events (Rounds 1 - 5)
+    // 3. Insert Round 1 News Events (2 per stock = 10 total)
+    // SECURITY: true_price_change and noise are HOST/ENGINE ONLY.
+    // The player API NEVER exposes these fields.
+    // noise=0.00 ensures exact predetermined final prices.
     const roundEventsData = [
-      // Round 1
-      {
-        round: 1,
-        ticker: 'NXB',
-        block_deal_text: 'Domestic institutional investor acquires 2,50,000 equity shares of Nexora Bank.',
-        news_text: 'Nexora Bank records 24% YoY surge in digital transaction volume and net interest margin growth.',
-        true_price_change: 12.0,
-        noise: 1.5
-      },
-      {
-        round: 1,
-        ticker: 'BFS',
-        block_deal_text: null,
-        news_text: 'ByteForge Systems secures multi-year cloud management contract with a global logistics hub.',
-        true_price_change: 5.0,
-        noise: 0.8
-      },
-      {
-        round: 1,
-        ticker: 'HXP',
-        block_deal_text: null,
-        news_text: 'Helixora Pharma announces successful Phase 1 safety trials for new oncology formulation.',
-        true_price_change: 2.0,
-        noise: 0.5
-      },
-      {
-        round: 1,
-        ticker: 'VTE',
-        block_deal_text: null,
-        news_text: 'Global crude price drop temporarily dampens renewable energy market sentiment.',
-        true_price_change: -4.0,
-        noise: 1.0
-      },
-      {
-        round: 1,
-        ticker: 'MAX',
-        block_deal_text: null,
-        news_text: 'MotoraX Mobility delivers 100 electric buses to state transport corporation.',
-        true_price_change: 1.0,
-        noise: 0.2
-      },
-
-      // Round 2
-      {
-        round: 2,
-        ticker: 'BFS',
-        block_deal_text: null,
-        news_text: 'Global microchip shortage causes 3-week delay in ByteForge enterprise server deployments.',
-        true_price_change: -15.0,
-        noise: -1.2
-      },
-      {
-        round: 2,
-        ticker: 'VTE',
-        block_deal_text: 'Surprise block trade executed in Voltaris Energy by green energy venture capital firm.',
-        news_text: 'Voltaris Energy unveils groundbreaking 50MW battery storage facility.',
-        true_price_change: 18.0,
-        noise: 2.0
-      },
-      {
-        round: 2,
-        ticker: 'HXP',
-        block_deal_text: null,
-        news_text: 'Helixora Pharma reports steady Q2 generic drug sales in overseas export markets.',
-        true_price_change: 6.0,
-        noise: -0.5
-      },
-      {
-        round: 2,
-        ticker: 'NXB',
-        block_deal_text: null,
-        news_text: 'Nexora Bank increases deposit rates by 25 bps to attract retail fixed deposits.',
-        true_price_change: -3.0,
-        noise: 0.4
-      },
-      {
-        round: 2,
-        ticker: 'MAX',
-        block_deal_text: null,
-        news_text: 'MotoraX Mobility maintains stable electric vehicle production targets.',
-        true_price_change: 0.0,
-        noise: 0.1
-      },
-
-      // Round 3
-      {
-        round: 3,
-        ticker: 'HXP',
-        block_deal_text: 'Bulk purchase of 5,00,000 shares of Helixora Pharma by international healthcare fund.',
-        news_text: 'Helixora Pharma receives WHO fast-track authorization for mass vaccine deployment.',
-        true_price_change: 22.0,
-        noise: 1.0
-      },
-      {
-        round: 3,
-        ticker: 'BFS',
-        block_deal_text: null,
-        news_text: 'ByteForge Systems resolves chip supply bottlenecks and resumes normal software integration.',
-        true_price_change: 10.0,
-        noise: 0.6
-      },
-      {
-        round: 3,
-        ticker: 'NXB',
-        block_deal_text: null,
-        news_text: 'Nexora Bank launches instant AI micro-loan app for small businesses.',
-        true_price_change: 4.0,
-        noise: -0.2
-      },
-      {
-        round: 3,
-        ticker: 'VTE',
-        block_deal_text: null,
-        news_text: 'Voltaris Energy faces short-term profit booking after recent price rally.',
-        true_price_change: -8.0,
-        noise: -1.0
-      },
-      {
-        round: 3,
-        ticker: 'MAX',
-        block_deal_text: null,
-        news_text: 'MotoraX Mobility expands EV charging network across 12 smart cities.',
-        true_price_change: 3.0,
-        noise: 0.3
-      },
-
-      // Round 4 (SEBI Check Round)
-      {
-        round: 4,
-        ticker: 'VTE',
-        block_deal_text: null,
-        news_text: 'Voltaris Energy wins ₹4,500 Crore mega solar grid EPC contract from central power grid.',
-        true_price_change: 24.0,
-        noise: 1.0
-      },
-      {
-        round: 4,
-        ticker: 'MAX',
-        block_deal_text: 'Promoter group sells 4% stake in MotoraX Mobility via open market block deal.',
-        news_text: 'MotoraX Mobility battery supplier reports temporary factory shutdown due to flooding.',
-        true_price_change: -12.0,
-        noise: -0.8
-      },
-      {
-        round: 4,
-        ticker: 'NXB',
-        block_deal_text: null,
-        news_text: 'Nexora Bank provisions additional reserves for unsecured credit card defaults.',
-        true_price_change: -5.0,
-        noise: 0.5
-      },
-      {
-        round: 4,
-        ticker: 'BFS',
-        block_deal_text: null,
-        news_text: 'ByteForge Systems trades flat amid mixed analyst ratings.',
-        true_price_change: -2.0,
-        noise: 0.2
-      },
-      {
-        round: 4,
-        ticker: 'HXP',
-        block_deal_text: null,
-        news_text: 'Helixora Pharma consolidates gains after previous vaccine approval spike.',
-        true_price_change: -4.0,
-        noise: -0.4
-      },
-
-      // Round 5
-      {
-        round: 5,
-        ticker: 'NXB',
-        block_deal_text: 'Final round strategic equity investment in Nexora Bank by global fintech group.',
-        news_text: 'Central Bank cuts repo rate by 50 bps; banking stock valuations skyrocket.',
-        true_price_change: 18.0,
-        noise: 1.2
-      },
-      {
-        round: 5,
-        ticker: 'BFS',
-        block_deal_text: null,
-        news_text: 'ByteForge Systems announces breakthrough Generative AI enterprise suite with high pre-orders.',
-        true_price_change: 20.0,
-        noise: 1.5
-      },
-      {
-        round: 5,
-        ticker: 'MAX',
-        block_deal_text: null,
-        news_text: 'MotoraX Mobility announces maiden dividend and commercial EV export deal to Southeast Asia.',
-        true_price_change: 12.0,
-        noise: 0.6
-      },
-      {
-        round: 5,
-        ticker: 'VTE',
-        block_deal_text: null,
-        news_text: 'Voltaris Energy reports stellar annual earnings exceeding street estimates.',
-        true_price_change: 10.0,
-        noise: 0.8
-      },
-      {
-        round: 5,
-        ticker: 'HXP',
-        block_deal_text: null,
-        news_text: 'Helixora Pharma posts solid quarterly revenue growth across all domestic formulations.',
-        true_price_change: 8.0,
-        noise: 0.4
-      }
+      // RELY (Final: -2.75%, noise=0)
+      { round: 1, ticker: 'RELY', block_deal_text: null,
+        news_text: "Relyant's retail arm reports its busiest month of store footfall this year, with festive-season stocking starting early.",
+        true_price_change: -2.75, noise: 0.00 },
+      { round: 1, ticker: 'RELY', block_deal_text: null,
+        news_text: "Relyant's telecom unit says tariff talks with regulators have not started, so no pricing change is expected soon.",
+        true_price_change: 0.00, noise: 0.00 },
+      // ADHI (Final: -11.00%, noise=0)
+      { round: 1, ticker: 'ADHI', block_deal_text: null,
+        news_text: "Adhira's new port expansion is stuck waiting for approvals, and its financing costs keep rising as interest rates stay high.",
+        true_price_change: -11.00, noise: 0.00 },
+      { round: 1, ticker: 'ADHI', block_deal_text: null,
+        news_text: 'Adhira signs a long-term cargo handling contract with a shipping line, adding steady port revenue over the coming years.',
+        true_price_change: 0.00, noise: 0.00 },
+      // TATV (Final: +11.00%, noise=0)
+      { round: 1, ticker: 'TATV', block_deal_text: null,
+        news_text: "Tatva's vehicle bookings are up sharply ahead of the festive season, and dealers report waiting lists on its top models.",
+        true_price_change: 11.00, noise: 0.00 },
+      { round: 1, ticker: 'TATV', block_deal_text: null,
+        news_text: "Falling steel and aluminium prices are expected to improve Tatva's profit margins.",
+        true_price_change: 0.00, noise: 0.00 },
+      // INFY-R (Final: +3.00%, noise=0)
+      { round: 1, ticker: 'INFY-R', block_deal_text: null,
+        news_text: 'Infyra wins a cloud migration contract from a large European retailer.',
+        true_price_change: 3.00, noise: 0.00 },
+      { round: 1, ticker: 'INFY-R', block_deal_text: null,
+        news_text: 'Infyra says some clients are delaying new technology spending until next year.',
+        true_price_change: 0.00, noise: 0.00 },
+      // SMBR (Final: +13.50%, noise=0)
+      { round: 1, ticker: 'SMBR', block_deal_text: null,
+        news_text: 'Sambar from Una opens three new outlets in smaller cities, and early crowds are strong.',
+        true_price_change: 13.50, noise: 0.00 },
+      { round: 1, ticker: 'SMBR', block_deal_text: null,
+        news_text: 'A food-industry survey says people are eating out more often in smaller cities, a market Sambar already serves.',
+        true_price_change: 0.00, noise: 0.00 }
     ];
 
     for (const ev of roundEventsData) {
@@ -351,150 +183,31 @@ async function seedMarketMayhem(forceRecreation = false) {
         ev.noise
       ]);
     }
-    console.log('📰 5 Rounds of Events & Price Drivers Seeded.');
+    console.log('📰 10 Round 1 News Events Seeded (2 per stock).');
 
-    // 4. Insert 12 Sample Tips (Approx 6 True, 4 False, 2 Super Tips)
+    // 4. Insert 4 Round 1 Insider Tips
+    // SECURITY: is_true, effect_size, is_flagged are HOST/ENGINE ONLY.
+    // Player API never exposes stock_id, is_true, effect_size, or is_flagged.
     const tipsData = [
-      // Round 1 Tips
       {
-        round: 1,
-        ticker: 'NXB',
-        source: 'Market Clerk',
-        price: 3000,
-        isSuper: false,
-        isTrue: true,
-        effect: 12.0,
-        isFlagged: false,
-        text: 'Unusual cash and digital deposit inflows observed at Nexora Bank urban branches this week.'
+        round: 1, ticker: 'SMBR', source: 'Board Member', price: 3000, isSuper: false,
+        isTrue: true, effect: 11.0, isFlagged: false,
+        text: 'Something big is coming for Sambar. Sources say a major supplier tie-up is about to be announced.'
       },
       {
-        round: 1,
-        ticker: 'BFS',
-        source: 'Junior Analyst',
-        price: 4000,
-        isSuper: false,
-        isTrue: true,
-        effect: 5.0,
-        isFlagged: false,
-        text: 'ByteForge Systems expected to comfortably meet Q1 cloud licensing targets.'
+        round: 1, ticker: 'ADHI', source: 'Middle Manager', price: 1500, isSuper: false,
+        isTrue: true, effect: -5.0, isFlagged: false,
+        text: "Adhira's expansion trouble is worse than the public news suggests. Lenders are getting nervous."
       },
       {
-        round: 1,
-        ticker: 'VTE',
-        source: 'Industry Insider',
-        price: 5500,
-        isSuper: false,
-        isTrue: false,
-        effect: -4.0,
-        isFlagged: false,
-        text: 'Rumor: Voltaris Energy facing severe lithium cell procurement bottlenecks this quarter.'
-      },
-
-      // Round 2 Tips
-      {
-        round: 2,
-        ticker: 'BFS',
-        source: 'Research Assistant',
-        price: 6000,
-        isSuper: false,
-        isTrue: true,
-        effect: -15.0,
-        isFlagged: true,
-        text: 'Leaked memo indicates microchip delivery failure halting ByteForge enterprise server production lines.'
+        round: 1, ticker: 'TATV', source: 'Clerk', price: 500, isSuper: false,
+        isTrue: true, effect: 5.0, isFlagged: false,
+        text: "Tatva's order book is stronger than reported, and a large fleet order may be on the way."
       },
       {
-        round: 2,
-        ticker: 'VTE',
-        source: 'Supplier',
-        price: 7500,
-        isSuper: false,
-        isTrue: true,
-        effect: 18.0,
-        isFlagged: false,
-        text: 'Voltaris battery deliveries to industrial grid projects up 40% over scheduled estimates.'
-      },
-      {
-        round: 2,
-        ticker: 'HXP',
-        source: 'Board Member',
-        price: 8000,
-        isSuper: false,
-        isTrue: false,
-        effect: 6.0,
-        isFlagged: false,
-        text: 'Internal memo claims Helixora clinical trials hit unexpected regulatory delays.'
-      },
-
-      // Round 3 Tips
-      {
-        round: 3,
-        ticker: 'HXP',
-        source: 'Industry Insider',
-        price: 12000,
-        isSuper: true,
-        isTrue: true,
-        effect: 22.0,
-        isFlagged: true,
-        text: 'SUPER TIP: World Health Organization approval letter for Helixora vaccine fast-track signed yesterday!'
-      },
-      {
-        round: 3,
-        ticker: 'NXB',
-        source: 'Market Clerk',
-        price: 3500,
-        isSuper: false,
-        isTrue: true,
-        effect: 4.0,
-        isFlagged: false,
-        text: 'Steady loan disbursement numbers noted across Nexora Bank SME business centers.'
-      },
-
-      // Round 4 Tips
-      {
-        round: 4,
-        ticker: 'VTE',
-        source: 'Research Assistant',
-        price: 9000,
-        isSuper: false,
-        isTrue: true,
-        effect: 24.0,
-        isFlagged: true,
-        text: 'Voltaris Energy selected as L1 highest bidder for government solar microgrid scheme.'
-      },
-      {
-        round: 4,
-        ticker: 'MAX',
-        source: 'Junior Analyst',
-        price: 4500,
-        isSuper: false,
-        isTrue: true,
-        effect: -12.0,
-        isFlagged: false,
-        text: 'MotoraX bus delivery schedule disrupted following flood damage at key battery assembly unit.'
-      },
-
-      // Round 5 Tips
-      {
-        round: 5,
-        ticker: 'NXB',
-        source: 'Board Member',
-        price: 15000,
-        isSuper: true,
-        isTrue: true,
-        effect: 18.0,
-        isFlagged: false,
-        text: 'SUPER TIP: Central Bank preparing emergency 50 bps interest rate cut to boost credit growth!'
-      },
-      {
-        round: 5,
-        ticker: 'BFS',
-        source: 'Supplier',
-        price: 5000,
-        isSuper: false,
-        isTrue: false,
-        effect: 20.0,
-        isFlagged: false,
-        text: 'ByteForge enterprise client renewals reported declining sharply in Q4.'
+        round: 1, ticker: 'INFY-R', source: 'Clerk', price: 500, isSuper: false,
+        isTrue: true, effect: 1.0, isFlagged: false,
+        text: 'Infyra may land a small extra contract this month. Not a huge deal, but positive.'
       }
     ];
 
